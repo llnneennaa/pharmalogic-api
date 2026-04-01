@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PharmaLogic - Smart Drug Interaction Analysis</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div id="app">
+        <!-- Navigation -->
+        <nav class="navbar">
+            <div class="nav-container">
+                <a href="#" class="logo" onclick="navigateTo('home'); return false;">
+                    <img src="https://cdn.builder.io/api/v1/image/assets%2F380d1cc95eac4a07914628e19d05692c%2Fbc57314bb1204ffd8ce3fab25bf7e69c?format=webp&width=800&height=1200" alt="PharmaLogic Logo" class="logo-img">
+                </a>
+                
+                <div class="nav-links">
+                    <a href="#" onclick="navigateTo('home'); return false;">Home</a>
+                    <a href="#" onclick="navigateTo('about'); return false;">About</a>
+                    <a href="#" onclick="navigateTo('guest-medical'); return false;">Medical Team (Guest)</a>
+                </div>
+
+                <div class="nav-buttons">
+                </div>
+
+                <button class="mobile-toggle" onclick="toggleMenu()">☰</button>
+            </div>
+
+            <div class="mobile-menu" id="mobileMenu">
+                <div>
+                    <a href="#" onclick="navigateTo('home'); return false;">Home</a>
+                    <a href="#" onclick="navigateTo('about'); return false;">About</a>
+                    <a href="#" onclick="navigateTo('guest-medical'); return false;">Medical Team (Guest)</a>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Main Content Area -->
+        <div id="page-content"></div>
+
+        <!-- Footer -->
+        <footer>
+            <div class="footer-container">
+                <div class="footer-grid">
+                    <div class="footer-section">
+                        <h4>PharmaLogic</h4>
+                        <p>Making medication safety intelligent</p>
+                    </div>
+                    <div class="footer-section">
+                        <h4>Product</h4>
+                        <ul>
+                            <li><a href="#" onclick="navigateTo('home', 'features'); return false;">Features</a></li>
+                            <li><a href="#" onclick="navigateTo('guest-medical'); return false;">Medical Team</a></li>
+                        </ul>
+                    </div>
+                    <div class="footer-section">
+                        <h4>Company</h4>
+                        <ul>
+                            <li><a href="#" onclick="navigateTo('about'); return false;">About</a></li>
+                            <li><a href="#" onclick="navigateTo('signup'); return false;">Sign Up</a></li>
+                        </ul>
+                    </div>
+                    <div class="footer-section">
+                        <h4>Legal</h4>
+                        <ul>
+                            <li><a href="#" onclick="showPrivacyPolicy(); return false;">Privacy</a></li>
+                            <li><a href="#" onclick="showTermsOfService(); return false;">Terms</a></li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="footer-bottom">
+                    <p>&copy; 2026 PharmaLogic. All rights reserved.</p>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <script src="/static/script.js"></script>
+</body>
+</html>
