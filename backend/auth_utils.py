@@ -5,32 +5,34 @@ can import this without circular-import issues.
 
 from datetime import datetime, timedelta
 from typing import Optional
+import bcrypt
 
 from fastapi import HTTPException, status
-from passlib.context import CryptContext
 from jose import JWTError, jwt
 
 SECRET_KEY = "pharmalogic-super-secret-key-change-in-production"
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
 
 def hash_password(password: str) -> str:
-    # تأكد من تحويل كلمة المرور إلى bytes
-    if isinstance(password, str):
-        password = password.encode('utf-8')
-    return pwd_context.hash(password)
+    """تشفير كلمة المرور باستخدام bcrypt"""
+    # تحويل كلمة المرور إلى bytes
+    password_bytes = password.encode('utf-8')
+    # إنشاء الملح (salt) وتشفير كلمة المرور
+    salt = bcrypt.gensalt()
+    hashed = bcrypt.hashpw(password_bytes, salt)
+    # إرجاع النتيجة كنص
+    return hashed.decode('utf-8')
 
 
 def verify_password(plain: str, hashed: str) -> bool:
-    # تأكد من تحويل كلمة المرور إلى bytes
-    if isinstance(plain, str):
-        plain = plain.encode('utf-8')
-    if isinstance(hashed, str):
-        hashed = hashed.encode('utf-8')
-    return pwd_context.verify(plain, hashed)
+    """التحقق من صحة كلمة المرور"""
+    # تحويل النصوص إلى bytes
+    plain_bytes = plain.encode('utf-8')
+    hashed_bytes = hashed.encode('utf-8')
+    # التحقق
+    return bcrypt.checkpw(plain_bytes, hashed_bytes)
 
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
