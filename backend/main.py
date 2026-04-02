@@ -160,33 +160,28 @@ def seed_data():
             ("Naproxen", "Warfarin", "high", "NSAIDs increase bleeding risk with anticoagulants."),
             ("Celecoxib", "Warfarin", "moderate", "May increase bleeding risk; monitor INR."),
             ("Morphine", "Tramadol", "moderate", "Increased CNS depression; monitor for respiratory depression."),
-            ("Naproxen", "Lisinopril", "moderate", "NSAIDs reduce antihypertensive effect and may impair renal function."),
             
             # تفاعلات جديدة - معدة وجهاز هضمي
-            ("Omeprazole", "Clopidogrel", "moderate", "Omeprazole reduces clopidogrel activation, may decrease antiplatelet effect."),
-            ("Metoclopramide", "Tramadol", "moderate", "Increased risk of serotonin syndrome."),
-            ("Loperamide", "Morphine", "high", "Additive CNS depression and increased constipation risk."),
+            ("Omeprazole", "Metformin", "low", "PPIs may reduce B12 absorption; monitor B12 levels."),
+            ("Metoclopramide", "Tramadol", "moderate", "Increased CNS depression risk."),
             
             # تفاعلات جديدة - تنفس
-            ("Albuterol", "Beta-blockers", "moderate", "Beta-blockers may reduce bronchodilator effect of albuterol."),
-            ("Prednisone", "Warfarin", "moderate", "Corticosteroids may alter INR; monitor closely."),
-            ("Montelukast", "Warfarin", "low", "Minimal interaction, but monitor INR during initiation."),
+            ("Albuterol", "Carvedilol", "moderate", "Beta-agonists may reduce beta-blocker effectiveness."),
+            ("Prednisone", "Metformin", "low", "Corticosteroids may increase blood glucose levels."),
         ]
 
-        # تخزين التفاعلات
-        for d1_name, d2_name, severity, desc in interactions_data:
-            if d1_name in drugs and d2_name in drugs:
-                itr = models.Interaction(
-                    drug1_id=drugs[d1_name].id,
-                    drug2_id=drugs[d2_name].id,
+        for drug1_name, drug2_name, severity, description in interactions_data:
+            if drug1_name in drugs and drug2_name in drugs:
+                interaction = models.Interaction(
+                    drug1_id=drugs[drug1_name].id,
+                    drug2_id=drugs[drug2_name].id,
                     severity=severity,
-                    description=desc,
+                    description=description
                 )
-                db.add(itr)
-                db.flush()
+                db.add(interaction)
 
-        # --- Lab Alerts (موسعة) ---
-        # سنقوم بإضافة تحذيرات للمختبر بناءً على التفاعلات الجديدة
+        # --- Lab Alerts ---
+        # Note: Lab alerts can be created after commits if needed
         lab_alerts_data = [
             (0, "Monitor PT/INR at least weekly when Aspirin + Warfarin are co-administered."),
             (1, "Check CBC and renal/hepatic function before and during Ibuprofen + Methotrexate therapy."),
@@ -229,55 +224,70 @@ app.add_middleware(
 
 # تحديد مسار مجلد frontend
 # البحث في عدة مسارات محتملة
-possible_paths = [
-    os.path.join(os.path.dirname(__file__), "..", "frontend"),  # backend/../frontend
-    os.path.join(os.path.dirname(__file__), "frontend"),        # backend/frontend
-    os.path.join(os.getcwd(), "frontend"),                      # current dir/frontend
-    os.path.join(os.getcwd(), "..", "frontend"),                # parent dir/frontend
-]
+def find_frontend_path():
+    """Find frontend folder in multiple possible locations"""
+    # على Render والـ development environments المختلفة
+    possible_paths = [
+        os.path.join(os.path.dirname(__file__), "..", "frontend"),  # backend/../frontend
+        os.path.join(os.path.dirname(__file__), "frontend"),        # backend/frontend
+        os.path.join(os.getcwd(), "frontend"),                      # current dir/frontend
+        os.path.join(os.getcwd(), "..", "frontend"),                # parent dir/frontend
+        "/opt/render/project/src/frontend",                         # Render specific path
+    ]
+    
+    for path in possible_paths:
+        try:
+            if os.path.exists(path) and os.path.isdir(path):
+                print(f"✅ Frontend folder found at: {path}")
+                return path
+        except Exception as e:
+            print(f"⚠️ Error checking path {path}: {e}")
+    
+    return None
 
-frontend_path = None
-for path in possible_paths:
-    if os.path.exists(path) and os.path.isdir(path):
-        frontend_path = path
-        break
+frontend_path = find_frontend_path()
 
 if frontend_path:
-    print(f"📁 Frontend folder found at: {frontend_path}")
-    
-    # تقديم الملفات الثابتة (CSS, JS, images)
-    app.mount("/static", StaticFiles(directory=frontend_path), name="static")
-    
-    # تقديم الصفحة الرئيسية
-    @app.get("/", response_class=HTMLResponse)
-    async def serve_frontend():
-        index_path = os.path.join(frontend_path, "index.html")
-        if os.path.exists(index_path):
-            with open(index_path, "r", encoding="utf-8") as f:
-                html_content = f.read()
-            return html_content
-        return HTMLResponse(
-            content=f"""
-            <html>
-                <head><title>PharmaLogic</title></head>
-                <body>
-                    <h1>index.html not found</h1>
-                    <p>Looking for: {index_path}</p>
-                    <p>Please make sure index.html exists in the frontend folder.</p>
-                </body>
-            </html>
-            """, 
-            status_code=404
-        )
-    
-    print("✅ Frontend static files configured")
-    print(f"   → Access the app at: http://localhost:8000")
-else:
+    try:
+        # تقديم الملفات الثابتة (CSS, JS, images)
+        app.mount("/static", StaticFiles(directory=frontend_path), name="static")
+        print("✅ Frontend static files configured")
+        
+        # تقديم الصفحة الرئيسية
+        @app.get("/", response_class=HTMLResponse)
+        async def serve_frontend():
+            index_path = os.path.join(frontend_path, "index.html")
+            if os.path.exists(index_path):
+                with open(index_path, "r", encoding="utf-8") as f:
+                    html_content = f.read()
+                return html_content
+            return HTMLResponse(
+                content=f"""
+                <html>
+                    <head><title>PharmaLogic</title></head>
+                    <body>
+                        <h1>index.html not found</h1>
+                        <p>Looking for: {index_path}</p>
+                        <p>Please make sure index.html exists in the frontend folder.</p>
+                    </body>
+                </html>
+                """, 
+                status_code=404
+            )
+    except Exception as e:
+        print(f"⚠️ Error mounting frontend: {e}")
+        frontend_path = None
+
+if not frontend_path:
     print("⚠️ Frontend folder not found!")
     print("   Looking in these paths:")
-    for path in possible_paths:
+    for path in [
+        os.path.join(os.path.dirname(__file__), "..", "frontend"),
+        os.path.join(os.path.dirname(__file__), "frontend"),
+        os.path.join(os.getcwd(), "frontend"),
+        os.path.join(os.getcwd(), "..", "frontend"),
+    ]:
         print(f"     - {path}")
-    print("   Make sure the 'frontend' folder exists with index.html, style.css, and script.js")
     
     # نقطة نهاية بديلة إذا لم يتم العثور على frontend
     @app.get("/", response_class=HTMLResponse)
@@ -286,10 +296,11 @@ else:
         <html>
             <head><title>PharmaLogic API</title></head>
             <body>
-                <h1>PharmaLogic API is running!</h1>
+                <h1>PharmaLogic API is running! ✅</h1>
                 <p>API Documentation: <a href="/docs">/docs</a></p>
                 <p>Health Check: <a href="/health">/health</a></p>
-                <p>⚠️ Frontend folder not found. Please create a 'frontend' folder with your HTML files.</p>
+                <p>Status: <a href="/api/status">/api/status</a></p>
+                <p>⚠️ Frontend folder not found. Make sure to include it in your deployment.</p>
             </body>
         </html>
         """

@@ -5,3 +5,5 @@ python-jose[cryptography]==3.3.0
 passlib==1.7.4
 bcrypt==4.1.0
 python-multipart==0.0.9
+pydantic==2.6.3
+pydantic-settings==2.1.0
