@@ -18,10 +18,18 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
 def hash_password(password: str) -> str:
+    # تأكد من تحويل كلمة المرور إلى bytes
+    if isinstance(password, str):
+        password = password.encode('utf-8')
     return pwd_context.hash(password)
 
 
 def verify_password(plain: str, hashed: str) -> bool:
+    # تأكد من تحويل كلمة المرور إلى bytes
+    if isinstance(plain, str):
+        plain = plain.encode('utf-8')
+    if isinstance(hashed, str):
+        hashed = hashed.encode('utf-8')
     return pwd_context.verify(plain, hashed)
 
 
