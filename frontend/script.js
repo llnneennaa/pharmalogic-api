@@ -4,8 +4,7 @@
 // ============================================================
 
 // Dynamically resolve API base
-const API_BASE = 'http://127.0.0.1:8000';
-
+const API_BASE = 'https://pharmalogic-api.onrender.com';
 // ── Global state ─────────────────────────────────────────────
 let currentPage = 'home';
 let currentUser = null;
