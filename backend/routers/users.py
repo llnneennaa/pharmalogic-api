@@ -10,25 +10,33 @@ import models
 import schemas
 from database import get_db
 from auth_utils import decode_token
+from typing import Optional
 
 router = APIRouter(prefix="/users", tags=["users"])
-bearer = HTTPBearer()
+bearer = HTTPBearer(auto_error=False)
 
 
 def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(bearer),
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(bearer),
     db: Session = Depends(get_db),
-) -> models.User:
-    """Get current user from JWT token"""
-    payload = decode_token(credentials.credentials)
-    user_id = payload.get("sub")
-    if not user_id:
-        raise HTTPException(status_code=401, detail="Invalid token payload")
-
-    user = db.query(models.User).filter(models.User.id == int(user_id)).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    return user
+) -> Optional[models.User]:
+    """Get current user from JWT token, returns None if not authenticated"""
+    
+    # إذا لم يكن هناك توكن، نرجع None (مستخدم زائر/ضيف)
+    if not credentials:
+        return None
+    
+    try:
+        payload = decode_token(credentials.credentials)
+        user_id = payload.get("sub")
+        if not user_id:
+            return None
+        
+        user = db.query(models.User).filter(models.User.id == int(user_id)).first()
+        return user
+    except Exception:
+        # إذا كان التوكن غير صالح، نعامل المستخدم كزائر
+        return None
 
 
 def require_role(*roles: str):
