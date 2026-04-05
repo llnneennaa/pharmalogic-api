@@ -651,6 +651,130 @@ function renderPatientDashboard() {
     `;
 }
 
+function renderEditProfileForm() {
+    const user = editFormData || currentUser;
+    const meds = parseMeds(user?.medications || '');
+
+    const medsList = meds.map(med => `
+        <li style="padding:.75rem;background:#FFE4CC;margin-bottom:.5rem;border-radius:.5rem;border-left:4px solid #FF8C00;color:#1B5E9D;font-weight:500;display:flex;justify-content:space-between;align-items:center;">
+            <span>${med}</span>
+            <button type="button" onclick="removeMedication('${med}')" style="background:#dc2626;color:white;border:none;padding:.25rem .5rem;border-radius:.25rem;cursor:pointer;font-size:.875rem;">✕</button>
+        </li>
+    `).join('');
+
+    return `
+        <form onsubmit="saveProfile(event)">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem;">
+                <h2 style="font-size:1.25rem;font-weight:700;color:#1B5E9D;margin:0;">Edit Your Medical Profile</h2>
+                <button type="button" onclick="cancelEdit()" style="padding:.5rem 1rem;background:#6b7280;color:white;border:none;border-radius:.5rem;cursor:pointer;font-weight:600;font-size:.875rem;">Cancel</button>
+            </div>
+            
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1rem;margin-bottom:1.5rem;">
+                <div class="form-group" style="margin:0;">
+                    <label style="font-size:.75rem;color:#4b5563;text-transform:uppercase;font-weight:600;">Age</label>
+                    <input type="number" id="editAge" value="${user?.age || ''}" style="width:100%;padding:.75rem;border:2px solid #e5e7eb;border-radius:.5rem;">
+                </div>
+                <div class="form-group" style="margin:0;">
+                    <label style="font-size:.75rem;color:#4b5563;text-transform:uppercase;font-weight:600;">Gender</label>
+                    <select id="editGender" style="width:100%;padding:.75rem;border:2px solid #e5e7eb;border-radius:.5rem;">
+                        <option value="">Select gender</option>
+                        <option value="male"   ${user?.gender==='male'   ?'selected':''}>Male</option>
+                        <option value="female" ${user?.gender==='female' ?'selected':''}>Female</option>
+                        <option value="other"  ${user?.gender==='other'  ?'selected':''}>Other</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div class="form-group" style="margin-bottom:1.5rem;">
+                <label style="font-size:.75rem;color:#4b5563;text-transform:uppercase;font-weight:600;">Chronic Conditions</label>
+                <input type="text" id="editConditions" value="${user?.conditions || ''}" placeholder="e.g., Diabetes, Hypertension" style="width:100%;padding:.75rem;border:2px solid #e5e7eb;border-radius:.5rem;">
+            </div>
+            
+            <div class="form-group" style="margin-bottom:1.5rem;">
+                <label style="font-size:.75rem;color:#4b5563;text-transform:uppercase;font-weight:600;">Allergies</label>
+                <input type="text" id="editAllergies" value="${user?.allergies || ''}" placeholder="e.g., Penicillin, Aspirin" style="width:100%;padding:.75rem;border:2px solid #e5e7eb;border-radius:.5rem;">
+            </div>
+            
+            <div class="form-group" style="margin-bottom:2rem;">
+                <label style="font-size:.75rem;color:#4b5563;text-transform:uppercase;font-weight:600;">Current Medications</label>
+                <ul style="list-style:none;padding:0;margin-bottom:1rem;max-height:200px;overflow-y:auto;">${medsList}</ul>
+                <div style="display:flex;gap:.5rem;">
+                    <input type="text" id="addMedication" placeholder="Add medication(s), comma-separated" style="flex:1;padding:.75rem;border:2px solid #e5e7eb;border-radius:.5rem;">
+                    <button type="button" onclick="addMedications()" style="padding:.75rem 1.5rem;background:#1B5E9D;color:white;border:none;border-radius:.5rem;cursor:pointer;font-weight:600;">Add</button>
+                </div>
+            </div>
+            
+            <div style="display:flex;gap:1rem;justify-content:flex-end;">
+                <button type="button" onclick="cancelEdit()" style="padding:.5rem 1rem;background:#6b7280;color:white;border:none;border-radius:.5rem;cursor:pointer;font-weight:600;">Cancel</button>
+                <button type="submit" class="form-button" id="saveProfileBtn" style="width:auto;">Save Changes</button>
+            </div>
+        </form>
+    `;
+}
+function editProfile() {
+    editFormData = { ...currentUser, medications: currentUser.medications || '' };
+    editingProfile = true;
+    renderPage();
+}
+
+function cancelEdit() {
+    editingProfile = false;
+    editFormData = null;
+    renderPage();
+}
+
+function removeMedication(med) {
+    const meds = parseMeds(editFormData.medications).filter(m => m !== med);
+    editFormData.medications = meds.join(', ');
+    renderPage();
+}
+
+function addMedications() {
+    const input = document.getElementById('addMedication');
+    const newMeds = input.value.split(',').map(m => m.trim()).filter(m => m);
+    if (!newMeds.length) return;
+
+    const current = parseMeds(editFormData.medications);
+    newMeds.forEach(m => { if (!current.includes(m)) current.push(m); });
+    editFormData.medications = current.join(', ');
+    input.value = '';
+    renderPage();
+}
+
+async function saveProfile(event) {
+    event.preventDefault();
+    const btn = document.getElementById('saveProfileBtn');
+    btn.disabled = true;
+    btn.textContent = 'Saving…';
+
+    const age = document.getElementById('editAge').value;
+    const gender = document.getElementById('editGender').value;
+    const conditions = document.getElementById('editConditions').value.trim();
+    const allergies = document.getElementById('editAllergies').value.trim();
+    const medications = editFormData.medications;
+
+    try {
+        const updated = await apiFetch('/users/me', {
+            method: 'PUT',
+            body: JSON.stringify({
+                age: age ? parseInt(age) : null,
+                gender,
+                conditions,
+                allergies,
+                medications
+            }),
+        });
+        currentUser = updated;
+        editingProfile = false;
+        editFormData = null;
+        renderPage();
+        showToast('Profile updated successfully!', 'success');
+    } catch (err) {
+        showToast(getProfessionalErrorMessage(err), 'error');
+        btn.disabled = false;
+        btn.textContent = 'Save Changes';
+    }
+}
 // Helper function to get vitamin warnings for medications
 function getVitaminWarningsForMeds(meds) {
     const vitaminRules = {
@@ -906,6 +1030,8 @@ function switchMedicalTab(tab) {
         }, 100);
     }
 }
+
+
 
 
 async function searchDrugInformation() {
