@@ -518,7 +518,87 @@ function getVitaminWarningsForMeds(meds) {
     }
     return warnings;
 }
-
+function showVitaminChecks() {
+    const content = document.getElementById('patientFeatureContent');
+    const meds = parseMeds(currentUser?.medications);
+    
+    // Get vitamin warnings for current medications
+    const vitaminWarnings = getVitaminWarningsForMeds(meds);
+    
+    let html = `
+        <div class="interaction-checker" style="border:2px solid #1B5E9D;">
+            <h2 style="color:#1B5E9D;">🧪 Vitamin & Lab Checks</h2>
+            <p style="color:#4b5563;margin-bottom:1.5rem;">Recommended laboratory tests and vitamin monitoring based on your current medications</p>
+    `;
+    
+    if (vitaminWarnings.length === 0) {
+        html += `
+            <div style="background:#f0fdf4;border:2px solid #16a34a;border-radius:.75rem;padding:1.5rem;text-align:center;">
+                <p style="color:#16a34a;font-size:1.1rem;">✓ No specific vitamin or lab monitoring required</p>
+                <p style="color:#4b5563;margin-top:.5rem;">Your current medications do not have known long-term nutrient depletions.</p>
+            </div>
+        `;
+    } else {
+        html += `
+            <div style="background:#eff6ff;border-radius:.75rem;padding:1.5rem;">
+                <h3 style="color:#1d4ed8;margin-bottom:1rem;">Recommended Checks (${vitaminWarnings.length})</h3>
+                <ul style="list-style:none;padding:0;">
+                    ${vitaminWarnings.map(w => `
+                        <li style="margin-bottom:1rem;padding:1rem;background:white;border-radius:.5rem;border-left:4px solid #3b82f6;box-shadow:0 1px 4px rgba(0,0,0,.07);">
+                            <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap;">
+                                <span style="font-size:1.5rem;">🧪</span>
+                                <div style="flex:1;">
+                                    <strong style="color:#1B5E9D;font-size:1.1rem;">${w.drug}</strong>
+                                    <div style="color:#d97706;margin:.25rem 0;">Long-term use may cause ${w.deficiency} deficiency</div>
+                                    <div style="color:#1B5E9D;font-size:.875rem;">→ ${w.recommendation}</div>
+                                </div>
+                            </div>
+                        </li>
+                    `).join('')}
+                </ul>
+                <div style="background:#fef3c7;border-radius:.5rem;padding:1rem;margin-top:1rem;">
+                    <p style="color:#b45309;font-size:.875rem;margin:0;">⚠️ These are general recommendations. Consult your healthcare provider for personalized advice.</p>
+                </div>
+            </div>
+        `;
+    }
+    
+    html += `
+            <button class="back-button" onclick="document.getElementById('patientFeatureContent').innerHTML=''" style="background:#1B5E9D;margin-top:1.5rem;">← Back to Dashboard</button>
+        </div>
+    `;
+    
+    content.innerHTML = html;
+}
+function showInteractionsChecker() {
+    const content = document.getElementById('patientFeatureContent');
+    const meds = parseMeds(currentUser?.medications);
+    
+    content.innerHTML = `
+        <div class="interaction-checker" style="border:2px solid #1B5E9D;">
+            <h2 style="color:#1B5E9D;">💊 Check Drug Interactions</h2>
+            <p style="color:#4b5563;margin-bottom:1.5rem;">Enter a new medication to check against your current medications via the live database</p>
+            ${meds.length ? `
+                <div style="background:#E0FFFF;padding:1rem;border-radius:.75rem;margin-bottom:1.5rem;border-left:4px solid #1B5E9D;">
+                    <p style="font-size:.875rem;color:#1B5E9D;font-weight:600;margin-bottom:.5rem;">Your Current Medications:</p>
+                    <div style="display:flex;flex-wrap:wrap;gap:.5rem;">
+                        ${meds.map(m => `<span style="background:#1B5E9D;color:white;padding:.25rem .75rem;border-radius:.25rem;font-size:.875rem;font-weight:500;">${m}</span>`).join('')}
+                    </div>
+                </div>` : '<p style="color:#4b5563;font-style:italic;margin-bottom:1.5rem;">No current medications in your profile.</p>'}
+            <div class="checker-form">
+                ${createAutocompleteInput('newDrug', 'Enter new medication')}
+                <button onclick="checkNewDrugInteractions()" style="background:#1B5E9D;">Check Interactions</button>
+            </div>
+            <div id="newDrugResults"></div>
+            <button class="back-button" onclick="document.getElementById('patientFeatureContent').innerHTML=''" style="background:#1B5E9D;margin-top:1rem;">← Back to Dashboard</button>
+        </div>
+    `;
+    
+    setTimeout(async () => {
+        const drugs = await getDrugList();
+        setupAutocomplete('newDrug', drugs);
+    }, 100);
+}
 function renderPatientDashboard() {
     if (!currentUser) {
         return `<div class="page-container"><p>Please <a onclick="navigateTo('login')">sign in</a> to view your dashboard.</p></div>`;
@@ -527,28 +607,27 @@ function renderPatientDashboard() {
         <div class="page-container">
             <div class="dashboard-header">
                 <h1>Welcome, ${currentUser.name || 'Patient'}</h1>
-                <p>Manage your medications and check for interactions</p>
+                <p>Manage your health and medications</p>
             </div>
 
+            <!-- Profile Summary Box with Edit Button -->
             <div style="max-width:1280px;margin:2rem auto;background:linear-gradient(135deg,rgba(255,140,0,.1) 0%,rgba(27,94,157,.1) 100%);border-radius:1rem;padding:2rem;box-shadow:0 2px 8px rgba(0,0,0,.1);border:2px solid #FFE4CC;">
                 ${editingProfile ? renderEditProfileForm() : renderViewProfileSummary()}
             </div>
 
-            <div class="dashboard-grid">
-                <div class="card" onclick="showPatientFeature('medications')" style="background:linear-gradient(135deg,rgba(255,140,0,.15) 0%,rgba(255,220,180,.1) 100%);border:2px solid #FFD580;cursor:pointer;">
-                    <div class="card-icon" style="background:#FF8C00;">💊</div>
-                    <h3>My Medications</h3>
-                    <p>View and manage your current medications</p>
+            <div class="dashboard-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:2rem;max-width:1280px;margin:2rem auto;">
+                <!-- زر التحاليل والفيتامينات -->
+                <div class="card" onclick="showPatientFeature('vitamin-checks')" style="background:linear-gradient(135deg,rgba(27,94,157,.15) 0%,rgba(173,216,230,.1) 100%);border:2px solid #87CEEB;cursor:pointer;text-align:center;">
+                    <div class="card-icon" style="background:#1B5E9D;margin:0 auto 1rem;">🧪</div>
+                    <h3 style="color:#1B5E9D;">Vitamin & Lab Checks</h3>
+                    <p style="color:#4b5563;">View vitamin deficiency warnings and recommended lab tests based on your medications</p>
                 </div>
-                <div class="card" onclick="showPatientFeature('medical-state')" style="background:linear-gradient(135deg,rgba(27,94,157,.15) 0%,rgba(173,216,230,.1) 100%);border:2px solid #87CEEB;cursor:pointer;">
-                    <div class="card-icon" style="background:#1B5E9D;">🏥</div>
-                    <h3>Medical State</h3>
-                    <p>View your health status and medicine effects</p>
-                </div>
-                <div class="card" onclick="showPatientFeature('interactions')" style="background:linear-gradient(135deg,rgba(27,94,157,.15) 0%,rgba(173,216,230,.1) 100%);border:2px solid #87CEEB;cursor:pointer;">
-                    <div class="card-icon" style="background:#1B5E9D;">🔍</div>
-                    <h3>Check Interactions</h3>
-                    <p>Verify interactions with your medications</p>
+                
+                <!-- زر التداخلات الدوائية -->
+                <div class="card" onclick="showPatientFeature('interactions')" style="background:linear-gradient(135deg,rgba(255,140,0,.15) 0%,rgba(255,220,180,.1) 100%);border:2px solid #FFD580;cursor:pointer;text-align:center;">
+                    <div class="card-icon" style="background:#FF8C00;margin:0 auto 1rem;">💊</div>
+                    <h3 style="color:#FF8C00;">Drug Interactions</h3>
+                    <p style="color:#4b5563;">Check for potential interactions between your medications</p>
                 </div>
             </div>
 
@@ -634,6 +713,11 @@ function showPatientFeature(feature) {
             const drugs = await getDrugList();
             setupAutocomplete('newDrug', drugs);
         }, 100);
+    }
+    else if (feature === 'vitamin-checks') {
+        showVitaminChecks();
+    } else if (feature === 'interactions') {
+        showInteractionsChecker();
     }
 }
 
