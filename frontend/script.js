@@ -1,10 +1,11 @@
-renderGuestMedical()// ============================================================
+// ============================================================
 //  PharmaLogic – Frontend (API-connected version)
 //  Version: 4.0 - Added Vitamin Deficiency Warnings
 // ============================================================
 
 // Dynamically resolve API base
 const API_BASE = 'https://pharmalogic-api.onrender.com';
+
 // ── Global state ─────────────────────────────────────────────
 let currentPage = 'home';
 let currentUser = null;
@@ -14,64 +15,36 @@ let editingProfile = false;
 let editFormData   = null;
 let drugCache = null;
 
-// ── Auth helpers ──────────────────────────────────────────────
+// ============================================================
+//  Helper Functions (Basic Utilities)
+// ============================================================
 
-function getToken()          { return localStorage.getItem('pharma_token'); }
-function setToken(t)         { localStorage.setItem('pharma_token', t); }
-function clearToken()        { localStorage.removeItem('pharma_token'); }
-
-function authHeaders() {
-    const token = getToken();
-    return token
-        ? { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }
-        : { 'Content-Type': 'application/json' };
+function parseMeds(str) {
+    if (!str) return [];
+    return str.split(',').map(m => m.trim()).filter(m => m.length > 0);
 }
 
-async function apiFetch(path, options = {}) {
-    let res;
-    try {
-        res = await fetch(`${API_BASE}${path}`, {
-            headers: authHeaders(),
-            ...options,
-        });
-    } catch (networkErr) {
-        throw new Error(
-            'Cannot reach the server. Make sure the backend is running:\n' +
-            'cd backend  →  uvicorn main:app --reload'
-        );
-    }
-
-    let data;
-    try { data = await res.json(); } catch { data = null; }
-
-    if (!res.ok) {
-        const msg = data?.detail || `Request failed (${res.status})`;
-        throw new Error(typeof msg === 'string' ? msg : JSON.stringify(msg));
-    }
-    return data;
+function cap(str) {
+    return str ? str.charAt(0).toUpperCase() + str.slice(1) : '';
 }
 
-// ── Professional error messages ──────────────────────────────
-
-function getProfessionalErrorMessage(err) {
-    const errorMessage = err.message || '';
-    
-    if (errorMessage.toLowerCase().includes('not found') || 
-        errorMessage.toLowerCase().includes('drug')) {
-        return `⚠️ The medication you entered is not registered in our database. 
-                Please check the spelling or contact our support team to add this medication.
-                You can also try using the generic name of the drug.`;
-    }
-    
-    if (errorMessage.toLowerCase().includes('cannot reach') || 
-        errorMessage.toLowerCase().includes('server')) {
-        return `⚠️ Unable to connect to the server. Please check your internet connection and try again.`;
-    }
-    
-    return `⚠️ ${errorMessage}`;
+function profileCard(label, value) {
+    return `
+        <div style="background:white;padding:1rem;border-radius:.75rem;border-left:4px solid #FF8C00;">
+            <p style="font-size:.75rem;color:#4b5563;margin-bottom:.25rem;text-transform:uppercase;font-weight:600;">${label}</p>
+            <p style="font-size:1.1rem;font-weight:700;color:#1B5E9D;">${value}</p>
+        </div>
+    `;
 }
 
-// ── Show non-blocking toast notification ─────────────────────
+function infoCard(label, value, borderColor, textColor) {
+    return `
+        <div style="background:white;padding:1rem;border-radius:.75rem;border-left:4px solid ${borderColor};">
+            <p style="font-size:.875rem;color:#4b5563;margin-bottom:.25rem;font-weight:600;">${label}</p>
+            <p style="font-size:1.125rem;font-weight:600;color:${textColor};">${value}</p>
+        </div>
+    `;
+}
 
 function showToast(msg, type = 'info') {
     const existing = document.getElementById('pharma-toast');
@@ -106,108 +79,62 @@ function showToast(msg, type = 'info') {
     setTimeout(() => { toast.style.opacity = '0'; setTimeout(() => toast.remove(), 400); }, 3500);
 }
 
-// ── Navigation ────────────────────────────────────────────────
-
-function navigateTo(page, anchor = null) {
-    currentPage = page;
-    if (page !== 'patient-dashboard') { editingProfile = false; }
-    closeMenu();
-    renderPage();
-    window.scrollTo(0, 0);
-    if (anchor) {
-        setTimeout(() => {
-            const el = document.getElementById(anchor);
-            if (el) el.scrollIntoView({ behavior: 'smooth' });
-        }, 100);
+function getProfessionalErrorMessage(err) {
+    const errorMessage = err.message || '';
+    
+    if (errorMessage.toLowerCase().includes('not found') || 
+        errorMessage.toLowerCase().includes('drug')) {
+        return `⚠️ The medication you entered is not registered in our database. 
+                Please check the spelling or contact our support team to add this medication.
+                You can also try using the generic name of the drug.`;
     }
-}
-
-function toggleMenu() { document.getElementById('mobileMenu').classList.toggle('active'); }
-function closeMenu()  { document.getElementById('mobileMenu').classList.remove('active'); }
-
-// ── Page router ───────────────────────────────────────────────
-
-function renderPage() {
-    const content = document.getElementById('page-content');
-    switch (currentPage) {
-        case 'home':              content.innerHTML = renderHome();             break;
-        case 'login':             content.innerHTML = renderLogin();            break;
-        case 'signup':            content.innerHTML = renderSignup();           break;
-        case 'patient-dashboard': content.innerHTML = renderPatientDashboard(); break;
-        case 'medical-dashboard': content.innerHTML = renderMedicalDashboard(); break;
-        case 'guest-medical':     
-            content.innerHTML = renderGuestMedical(); 
-            setTimeout(() => initAutocompleteForGuest(), 100);
-            break;
-        case 'about':             content.innerHTML = renderAbout();            break;
-        default:                  content.innerHTML = renderHome();
+    
+    if (errorMessage.toLowerCase().includes('cannot reach') || 
+        errorMessage.toLowerCase().includes('server')) {
+        return `⚠️ Unable to connect to the server. Please check your internet connection and try again.`;
     }
-    updateNavbar();
+    
+    return `⚠️ ${errorMessage}`;
 }
 
-// ── Updated Navbar with conditional buttons ───────────────────
+// ============================================================
+//  Auth Functions
+// ============================================================
 
-function updateNavbar() {
-    const navBtns = document.querySelector('.nav-buttons');
-    const mobileMenu = document.getElementById('mobileMenu');
-    if (!navBtns) return;
+function getToken() { return localStorage.getItem('pharma_token'); }
+function setToken(t) { localStorage.setItem('pharma_token', t); }
+function clearToken() { localStorage.removeItem('pharma_token'); }
 
-    const isHomePage = currentPage === 'home';
+function authHeaders() {
+    const token = getToken();
+    return token
+        ? { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }
+        : { 'Content-Type': 'application/json' };
+}
 
-    if (currentUser) {
-        navBtns.innerHTML = `
-            <span style="color:#2d2d47;font-weight:500;font-size:0.9rem;">Hi, ${currentUser.name?.split(' ')[0] || 'User'}</span>
-            <a class="btn btn-secondary" onclick="navigateTo('patient-dashboard')" style="cursor:pointer;padding:0.4rem 1.2rem;background:#1B5E9D;color:white;border-radius:0.5rem;font-weight:500;">Dashboard</a>
-            <a class="btn btn-secondary" onclick="handleLogout()" style="cursor:pointer;padding:0.4rem 1.2rem;background:#f3f4f6;border-radius:0.5rem;font-weight:500;">Sign Out</a>
-        `;
-        if (mobileMenu && mobileMenu.querySelector('div')) {
-            mobileMenu.querySelector('div').innerHTML = `
-                <a href="#" onclick="navigateTo('home'); return false;">Home</a>
-                <a href="#" onclick="navigateTo('about'); return false;">About</a>
-                <a href="#" onclick="navigateTo('guest-medical'); return false;">Medical Team (Guest)</a>
-                <a href="#" onclick="navigateTo('patient-dashboard'); return false;">Dashboard</a>
-                <a href="#" onclick="handleLogout(); return false;">Sign Out</a>
-            `;
-        }
-    } else {
-        if (isHomePage) {
-            navBtns.innerHTML = ``;
-            if (mobileMenu && mobileMenu.querySelector('div')) {
-                mobileMenu.querySelector('div').innerHTML = `
-                    <a href="#" onclick="navigateTo('home'); return false;">Home</a>
-                    <a href="#" onclick="navigateTo('about'); return false;">About</a>
-                    <a href="#" onclick="navigateTo('guest-medical'); return false;">Medical Team (Guest)</a>
-                `;
-            }
-        } else {
-            navBtns.innerHTML = `
-                <a class="signin" onclick="navigateTo('login')" style="cursor:pointer;padding:0.5rem 1rem;color:#1B5E9D;font-weight:500;">Sign In</a>
-                <a class="signup" onclick="navigateTo('signup')" style="cursor:pointer;padding:0.5rem 1.25rem;background:#FF8C00;color:white;border-radius:0.5rem;font-weight:500;">Get Started</a>
-            `;
-            if (mobileMenu && mobileMenu.querySelector('div')) {
-                mobileMenu.querySelector('div').innerHTML = `
-                    <a href="#" onclick="navigateTo('home'); return false;">Home</a>
-                    <a href="#" onclick="navigateTo('about'); return false;">About</a>
-                    <a href="#" onclick="navigateTo('guest-medical'); return false;">Medical Team (Guest)</a>
-                    <a href="#" onclick="navigateTo('login'); return false;">Sign In</a>
-                    <a href="#" onclick="navigateTo('signup'); return false;">Get Started</a>
-                `;
-            }
-        }
+async function apiFetch(path, options = {}) {
+    let res;
+    try {
+        res = await fetch(`${API_BASE}${path}`, {
+            headers: authHeaders(),
+            ...options,
+        });
+    } catch (networkErr) {
+        throw new Error(
+            'Cannot reach the server. Make sure the backend is running:\n' +
+            'cd backend  →  uvicorn main:app --reload'
+        );
     }
+
+    let data;
+    try { data = await res.json(); } catch { data = null; }
+
+    if (!res.ok) {
+        const msg = data?.detail || `Request failed (${res.status})`;
+        throw new Error(typeof msg === 'string' ? msg : JSON.stringify(msg));
+    }
+    return data;
 }
-
-// ── Logout ────────────────────────────────────────────────────
-
-function handleLogout() {
-    clearToken();
-    currentUser = null;
-    userRole    = null;
-    showToast('Signed out successfully.', 'info');
-    navigateTo('home');
-}
-
-// ── Auto-login from stored token ──────────────────────────────
 
 async function tryAutoLogin() {
     const token = getToken();
@@ -220,225 +147,6 @@ async function tryAutoLogin() {
     } catch {
         clearToken();
     }
-}
-
-// ── Autocomplete Functions ────────────────────────────────────
-
-async function getDrugList() {
-    if (drugCache) return drugCache;
-    
-    try {
-        const drugs = await apiFetch('/drugs');
-        drugCache = drugs.map(d => d.name);
-        return drugCache;
-    } catch (err) {
-        console.error('Failed to fetch drugs:', err);
-        return [];
-    }
-}
-
-function createAutocompleteInput(inputId, placeholder) {
-    return `
-        <div class="autocomplete-container" style="position:relative;width:100%;">
-            <input type="text" id="${inputId}" placeholder="${placeholder}" autocomplete="off">
-            <div id="${inputId}-suggestions" class="autocomplete-suggestions" style="display:none;position:absolute;top:100%;left:0;right:0;background:white;border:1px solid #e5e7eb;border-radius:.5rem;max-height:200px;overflow-y:auto;z-index:1000;box-shadow:0 4px 6px rgba(0,0,0,0.1);"></div>
-        </div>
-    `;
-}
-
-function setupAutocomplete(inputId, drugList) {
-    const input = document.getElementById(inputId);
-    const suggestionsDiv = document.getElementById(`${inputId}-suggestions`);
-    if (!input || !suggestionsDiv) return;
-
-    const showSuggestions = (filter) => {
-        const filtered = drugList.filter(d => 
-            d.toLowerCase().includes(filter.toLowerCase())
-        ).slice(0, 8);
-
-        if (filtered.length > 0 && filter.length >= 2) {
-            suggestionsDiv.innerHTML = filtered.map(d => 
-                `<div style="padding:.75rem;cursor:pointer;border-bottom:1px solid #f3f4f6;transition:background 0.2s;" 
-                      onmouseover="this.style.backgroundColor='#f3f4f6'" 
-                      onmouseout="this.style.backgroundColor='white'"
-                      onclick="document.getElementById('${inputId}').value='${d.replace(/'/g, "\\'")}'; document.getElementById('${inputId}-suggestions').style.display='none';">
-                    ${d}
-                </div>`
-            ).join('');
-            suggestionsDiv.style.display = 'block';
-        } else {
-            suggestionsDiv.style.display = 'none';
-        }
-    };
-
-    input.addEventListener('input', (e) => {
-        const value = e.target.value.trim();
-        if (value.length >= 2) {
-            showSuggestions(value);
-        } else {
-            suggestionsDiv.style.display = 'none';
-        }
-    });
-
-    input.addEventListener('blur', () => {
-        setTimeout(() => {
-            suggestionsDiv.style.display = 'none';
-        }, 200);
-    });
-}
-
-async function initAutocompleteForGuest() {
-    const drugs = await getDrugList();
-    setupAutocomplete('guestDrug1', drugs);
-    setupAutocomplete('guestDrug2', drugs);
-}
-
-// ============================================================
-//  HOME PAGE
-// ============================================================
-
-function renderHome() {
-    return `
-        <div class="page-container">
-            <div class="hero">
-                <div class="hero-content">
-                    <div class="badge"><span>Smart Drug Interaction Analysis</span></div>
-                    <h1>Safer Prescriptions, <span class="highlight">Smarter Care</span></h1>
-                    <p>PharmaLogic uses intelligent analysis to detect potential drug interactions instantly, helping healthcare professionals and patients make informed medication decisions.</p>
-                    <div class="hero-buttons">
-                        <button class="btn btn-primary" onclick="navigateTo('signup')">Get Started →</button>
-                        <button class="btn btn-secondary" onclick="navigateTo('login')">Sign In</button>
-                    </div>
-                </div>
-                <div class="hero-visual">
-                    <div class="hero-card">
-                        <div>
-                            <div class="hero-icon icon-green">✓</div>
-                            <div>
-                                <h3>Safe Interaction Check</h3>
-                                <p>Instant analysis of drug combinations</p>
-                            </div>
-                        </div>
-                        <div>
-                            <div class="hero-icon icon-amber">!</div>
-                            <div>
-                                <h3>Risk Assessment</h3>
-                                <p>Clear risk levels and explanations</p>
-                            </div>
-                        </div>
-                        <div>
-                            <div class="hero-icon icon-blue">📄</div>
-                            <div>
-                                <h3>PDF Reports</h3>
-                                <p>Export data for healthcare professionals</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <section class="user-types">
-                <div class="user-types-container">
-                    <div class="section-header">
-                        <h2>Built for Every Role</h2>
-                        <p>Tailored interfaces for patients and healthcare professionals</p>
-                    </div>
-                    <div class="user-grid">
-                        <div class="user-card patient">
-                            <div class="user-card-icon">👤</div>
-                            <h3>For Patients</h3>
-                            <p>Manage your medications and check for potential interactions with your current prescriptions.</p>
-                            <ul class="user-features">
-                                <li><span class="checkmark">✓</span> Personal medication history</li>
-                                <li><span class="checkmark">✓</span> Real-time interaction checking</li>
-                                <li><span class="checkmark">✓</span> PDF export functionality</li>
-                            </ul>
-                        </div>
-                        <div class="user-card doctor">
-                            <div class="user-card-icon">⚕️</div>
-                            <h3>For Medical Professionals</h3>
-                            <p>Fast and reliable medical analysis to search for drug interactions and enhance clinical decisions.</p>
-                            <ul class="user-features">
-                                <li><span class="checkmark">✓</span> Fast interaction search</li>
-                                <li><span class="checkmark">✓</span> Reliable medical analysis</li>
-                                <li><span class="checkmark">✓</span> Enhanced clinical knowledge</li>
-                            </ul>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            <section class="features" id="features">
-                <div class="features-container">
-                    <div class="section-header">
-                        <h2>Powerful Features</h2>
-                        <p>Everything you need for safe medication management</p>
-                    </div>
-                    <div class="features-grid">
-                        <div class="feature-item">
-                            <div class="feature-icon blue">⚡</div>
-                            <div><h3>Instant Analysis</h3><p>Real-time interaction checks powered by your database</p></div>
-                        </div>
-                        <div class="feature-item">
-                            <div class="feature-icon teal">🔒</div>
-                            <div><h3>Secure & Private</h3><p>JWT-secured with strict role-based access controls</p></div>
-                        </div>
-                        <div class="feature-item">
-                            <div class="feature-icon blue">📊</div>
-                            <div><h3>Reliable Medical Analysis</h3><p>Comprehensive rules engine with lab alert system</p></div>
-                        </div>
-                        <div class="feature-item">
-                            <div class="feature-icon teal">📋</div>
-                            <div><h3>Report Export</h3><p>Download and share comprehensive PDF reports</p></div>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            <section class="cta">
-                <div class="cta-container">
-                    <h2>Ready to Get Started?</h2>
-                    <p>Join patients and healthcare professionals who trust PharmaLogic for safer prescriptions</p>
-                    <button class="btn btn-primary" onclick="navigateTo('signup')" style="background:white;color:#2B8EFF;">Create Your Account →</button>
-                </div>
-            </section>
-        </div>
-    `;
-}
-
-// ============================================================
-//  LOGIN PAGE
-// ============================================================
-
-function renderLogin() {
-    return `
-        <div class="page-container">
-            <div class="form-container">
-                <h1>Welcome Back</h1>
-                <p>Sign in to your PharmaLogic account to continue</p>
-
-                <form id="loginForm" onsubmit="handleLogin(event)">
-                    <div class="form-group">
-                        <label for="loginEmail">Email Address</label>
-                        <input type="email" id="loginEmail" placeholder="you@example.com" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="loginPassword">Password</label>
-                        <input type="password" id="loginPassword" placeholder="••••••••" required>
-                    </div>
-
-                    <div id="loginError" style="display:none;color:#dc2626;background:#fef2f2;padding:.75rem;border-radius:.5rem;margin-bottom:1rem;font-size:.9rem;"></div>
-
-                    <button type="submit" class="form-button" id="loginBtn">Sign In</button>
-                </form>
-
-                <div class="signup-link">
-                    Don't have an account? <a onclick="navigateTo('signup'); return false;">Create one now</a>
-                </div>
-                <button class="back-button" onclick="navigateTo('home')" style="margin-top:1rem;">← Back to Home</button>
-            </div>
-        </div>
-    `;
 }
 
 async function handleLogin(event) {
@@ -472,84 +180,6 @@ async function handleLogin(event) {
         btn.disabled  = false;
         btn.textContent = 'Sign In';
     }
-}
-
-// ============================================================
-//  SIGNUP PAGE (Modified: removed doctor/pharmacist roles)
-// ============================================================
-
-function renderSignup() {
-    return `
-        <div class="page-container">
-            <div class="form-container">
-                <h1>Create Account</h1>
-                <p>Join PharmaLogic to check drug interactions safely</p>
-
-                <form id="signupForm" onsubmit="handleSignup(event)">
-                    <input type="hidden" id="selectedRole" value="patient">
-
-                    <div class="form-group">
-                        <label for="fullName">Full Name</label>
-                        <input type="text" id="fullName" placeholder="John Doe" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="signupEmail">Email Address</label>
-                        <input type="email" id="signupEmail" placeholder="you@example.com" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="signupPassword">Password</label>
-                        <input type="password" id="signupPassword" placeholder="••••••••" required minlength="6">
-                    </div>
-                    <div class="form-group">
-                        <label for="confirmPassword">Confirm Password</label>
-                        <input type="password" id="confirmPassword" placeholder="••••••••" required>
-                    </div>
-
-                    <div id="patientFields">
-                        <div class="form-group">
-                            <label for="age">Age</label>
-                            <input type="number" id="age" placeholder="30" min="1" max="130">
-                        </div>
-                        <div class="form-group">
-                            <label for="gender">Gender</label>
-                            <select id="gender">
-                                <option value="">Select gender</option>
-                                <option value="male">Male</option>
-                                <option value="female">Female</option>
-                                <option value="other">Other</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label for="medicalConditions">Chronic Conditions (comma-separated)</label>
-                            <input type="text" id="medicalConditions" placeholder="e.g., Diabetes, Hypertension">
-                        </div>
-                        <div class="form-group">
-                            <label for="allergies">Allergies (comma-separated)</label>
-                            <input type="text" id="allergies" placeholder="e.g., Penicillin, Aspirin">
-                        </div>
-                        <div class="form-group">
-                            <label for="currentMedications">Current Medications (comma-separated)</label>
-                            <input type="text" id="currentMedications" placeholder="e.g., Aspirin, Metformin">
-                        </div>
-                    </div>
-
-                    <div class="checkbox-group">
-                        <input type="checkbox" id="termsAgree" required>
-                        <label for="termsAgree">I agree to the <a href="#" onclick="showTermsOfService(); return false;">Terms of Service</a> and <a href="#" onclick="showPrivacyPolicy(); return false;">Privacy Policy</a></label>
-                    </div>
-
-                    <div id="signupError" style="display:none;color:#dc2626;background:#fef2f2;padding:.75rem;border-radius:.5rem;margin-bottom:1rem;font-size:.9rem;"></div>
-
-                    <button type="submit" class="form-button" id="signupBtn">Create Account</button>
-                </form>
-
-                <div class="signup-link">
-                    Already have an account? <a onclick="navigateTo('login'); return false;">Sign in here</a>
-                </div>
-                <button class="back-button" onclick="navigateTo('home')" style="margin-top:1rem;">← Back to Home</button>
-            </div>
-        </div>
-    `;
 }
 
 async function handleSignup(event) {
@@ -608,45 +238,128 @@ async function handleSignup(event) {
     }
 }
 
+function handleLogout() {
+    clearToken();
+    currentUser = null;
+    userRole    = null;
+    showToast('Signed out successfully.', 'info');
+    navigateTo('home');
+}
+
 // ============================================================
-//  PATIENT DASHBOARD (Modified: Removed profile box)
+//  Navigation Functions
 // ============================================================
 
-function renderPatientDashboard() {
-    if (!currentUser) {
-        return `<div class="page-container"><p>Please <a onclick="navigateTo('login')">sign in</a> to view your dashboard.</p></div>`;
+function navigateTo(page, anchor = null) {
+    currentPage = page;
+    if (page !== 'patient-dashboard') { editingProfile = false; }
+    closeMenu();
+    renderPage();
+    window.scrollTo(0, 0);
+    if (anchor) {
+        setTimeout(() => {
+            const el = document.getElementById(anchor);
+            if (el) el.scrollIntoView({ behavior: 'smooth' });
+        }, 100);
     }
+}
+
+function toggleMenu() { document.getElementById('mobileMenu').classList.toggle('active'); }
+function closeMenu()  { document.getElementById('mobileMenu').classList.remove('active'); }
+
+function renderPage() {
+    const content = document.getElementById('page-content');
+    switch (currentPage) {
+        case 'home':              content.innerHTML = renderHome();             break;
+        case 'login':             content.innerHTML = renderLogin();            break;
+        case 'signup':            content.innerHTML = renderSignup();           break;
+        case 'patient-dashboard': content.innerHTML = renderPatientDashboard(); break;
+        case 'medical-dashboard': content.innerHTML = renderMedicalDashboard(); break;
+        case 'guest-medical':     
+            content.innerHTML = renderGuestMedical(); 
+            setTimeout(() => initAutocompleteForGuest(), 100);
+            break;
+        case 'about':             content.innerHTML = renderAbout();            break;
+        default:                  content.innerHTML = renderHome();
+    }
+    updateNavbar();
+}
+
+function updateNavbar() {
+    const navBtns = document.querySelector('.nav-buttons');
+    const mobileMenu = document.getElementById('mobileMenu');
+    if (!navBtns) return;
+
+    const isHomePage = currentPage === 'home';
+
+    if (currentUser) {
+        navBtns.innerHTML = `
+            <span style="color:#2d2d47;font-weight:500;font-size:0.9rem;">Hi, ${currentUser.name?.split(' ')[0] || 'User'}</span>
+            <a class="btn btn-secondary" onclick="navigateTo('patient-dashboard')" style="cursor:pointer;padding:0.4rem 1.2rem;background:#1B5E9D;color:white;border-radius:0.5rem;font-weight:500;">Dashboard</a>
+            <a class="btn btn-secondary" onclick="handleLogout()" style="cursor:pointer;padding:0.4rem 1.2rem;background:#f3f4f6;border-radius:0.5rem;font-weight:500;">Sign Out</a>
+        `;
+        if (mobileMenu && mobileMenu.querySelector('div')) {
+            mobileMenu.querySelector('div').innerHTML = `
+                <a href="#" onclick="navigateTo('home'); return false;">Home</a>
+                <a href="#" onclick="navigateTo('about'); return false;">About</a>
+                <a href="#" onclick="navigateTo('guest-medical'); return false;">Medical Team (Guest)</a>
+                <a href="#" onclick="navigateTo('patient-dashboard'); return false;">Dashboard</a>
+                <a href="#" onclick="handleLogout(); return false;">Sign Out</a>
+            `;
+        }
+    } else {
+        if (isHomePage) {
+            navBtns.innerHTML = ``;
+            if (mobileMenu && mobileMenu.querySelector('div')) {
+                mobileMenu.querySelector('div').innerHTML = `
+                    <a href="#" onclick="navigateTo('home'); return false;">Home</a>
+                    <a href="#" onclick="navigateTo('about'); return false;">About</a>
+                    <a href="#" onclick="navigateTo('guest-medical'); return false;">Medical Team (Guest)</a>
+                `;
+            }
+        } else {
+            navBtns.innerHTML = `
+                <a class="signin" onclick="navigateTo('login')" style="cursor:pointer;padding:0.5rem 1rem;color:#1B5E9D;font-weight:500;">Sign In</a>
+                <a class="signup" onclick="navigateTo('signup')" style="cursor:pointer;padding:0.5rem 1.25rem;background:#FF8C00;color:white;border-radius:0.5rem;font-weight:500;">Get Started</a>
+            `;
+            if (mobileMenu && mobileMenu.querySelector('div')) {
+                mobileMenu.querySelector('div').innerHTML = `
+                    <a href="#" onclick="navigateTo('home'); return false;">Home</a>
+                    <a href="#" onclick="navigateTo('about'); return false;">About</a>
+                    <a href="#" onclick="navigateTo('guest-medical'); return false;">Medical Team (Guest)</a>
+                    <a href="#" onclick="navigateTo('login'); return false;">Sign In</a>
+                    <a href="#" onclick="navigateTo('signup'); return false;">Get Started</a>
+                `;
+            }
+        }
+    }
+}
+
+// ============================================================
+//  Patient Dashboard Functions
+// ============================================================
+
+function renderViewProfileSummary() {
+    const meds = parseMeds(currentUser?.medications);
+    const allergies = currentUser?.allergies || 'None';
+    const medHTML = meds.length
+        ? meds.map(m => `<span style="display:inline-block;background:#FFE4CC;color:#1B5E9D;padding:.4rem .9rem;border-radius:.5rem;margin:.2rem;font-size:.875rem;font-weight:500;">${m}</span>`).join('')
+        : '<p style="color:#4b5563;font-style:italic;">No medications added yet</p>';
+
     return `
-        <div class="page-container">
-            <div class="dashboard-header">
-                <h1>Welcome, ${currentUser.name || 'Patient'}</h1>
-                <p>Manage your medications and check for interactions</p>
-            </div>
-
-            <!-- Profile Summary Box with Edit Button -->
-            <div style="max-width:1280px;margin:2rem auto;background:linear-gradient(135deg,rgba(255,140,0,.1) 0%,rgba(27,94,157,.1) 100%);border-radius:1rem;padding:2rem;box-shadow:0 2px 8px rgba(0,0,0,.1);border:2px solid #FFE4CC;">
-                ${editingProfile ? renderEditProfileForm() : renderViewProfileSummary()}
-            </div>
-
-            <div class="dashboard-grid">
-                <div class="card" onclick="showPatientFeature('medications')" style="background:linear-gradient(135deg,rgba(255,140,0,.15) 0%,rgba(255,220,180,.1) 100%);border:2px solid #FFD580;cursor:pointer;">
-                    <div class="card-icon" style="background:#FF8C00;">💊</div>
-                    <h3>My Medications</h3>
-                    <p>View and manage your current medications</p>
-                </div>
-                <div class="card" onclick="showPatientFeature('medical-state')" style="background:linear-gradient(135deg,rgba(27,94,157,.15) 0%,rgba(173,216,230,.1) 100%);border:2px solid #87CEEB;cursor:pointer;">
-                    <div class="card-icon" style="background:#1B5E9D;">🏥</div>
-                    <h3>Medical State</h3>
-                    <p>View your health status and medicine effects</p>
-                </div>
-                <div class="card" onclick="showPatientFeature('interactions')" style="background:linear-gradient(135deg,rgba(27,94,157,.15) 0%,rgba(173,216,230,.1) 100%);border:2px solid #87CEEB;cursor:pointer;">
-                    <div class="card-icon" style="background:#1B5E9D;">🔍</div>
-                    <h3>Check Interactions</h3>
-                    <p>Verify interactions with your medications</p>
-                </div>
-            </div>
-
-            <div id="patientFeatureContent"></div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem;">
+            <h2 style="font-size:1.25rem;font-weight:700;color:#1B5E9D;margin:0;">Your Medical Profile</h2>
+            <button onclick="editProfile()" style="padding:.5rem 1rem;background:#1B5E9D;color:white;border:none;border-radius:.5rem;cursor:pointer;font-weight:600;font-size:.875rem;">✏️ Edit Profile</button>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:1rem;margin-bottom:1.5rem;">
+            ${profileCard('Age', currentUser?.age || 'Not provided')}
+            ${profileCard('Gender', currentUser?.gender ? cap(currentUser.gender) : 'Not provided')}
+            ${profileCard('Medical Conditions', currentUser?.conditions || 'None')}
+            ${profileCard('Allergies', allergies)}
+        </div>
+        <div>
+            <p style="font-size:.75rem;color:#4b5563;margin-bottom:.5rem;text-transform:uppercase;font-weight:600;">Current Medications (${meds.length})</p>
+            <div style="display:flex;flex-wrap:wrap;gap:.5rem;">${medHTML}</div>
         </div>
     `;
 }
@@ -711,6 +424,7 @@ function renderEditProfileForm() {
         </form>
     `;
 }
+
 function editProfile() {
     editFormData = { ...currentUser, medications: currentUser.medications || '' };
     editingProfile = true;
@@ -775,7 +489,7 @@ async function saveProfile(event) {
         btn.textContent = 'Save Changes';
     }
 }
-// Helper function to get vitamin warnings for medications
+
 function getVitaminWarningsForMeds(meds) {
     const vitaminRules = {
         "Metformin": { deficiency: "Vitamin B12", recommendation: "Check Vitamin B12 levels annually" },
@@ -805,12 +519,49 @@ function getVitaminWarningsForMeds(meds) {
     return warnings;
 }
 
+function renderPatientDashboard() {
+    if (!currentUser) {
+        return `<div class="page-container"><p>Please <a onclick="navigateTo('login')">sign in</a> to view your dashboard.</p></div>`;
+    }
+    return `
+        <div class="page-container">
+            <div class="dashboard-header">
+                <h1>Welcome, ${currentUser.name || 'Patient'}</h1>
+                <p>Manage your medications and check for interactions</p>
+            </div>
+
+            <div style="max-width:1280px;margin:2rem auto;background:linear-gradient(135deg,rgba(255,140,0,.1) 0%,rgba(27,94,157,.1) 100%);border-radius:1rem;padding:2rem;box-shadow:0 2px 8px rgba(0,0,0,.1);border:2px solid #FFE4CC;">
+                ${editingProfile ? renderEditProfileForm() : renderViewProfileSummary()}
+            </div>
+
+            <div class="dashboard-grid">
+                <div class="card" onclick="showPatientFeature('medications')" style="background:linear-gradient(135deg,rgba(255,140,0,.15) 0%,rgba(255,220,180,.1) 100%);border:2px solid #FFD580;cursor:pointer;">
+                    <div class="card-icon" style="background:#FF8C00;">💊</div>
+                    <h3>My Medications</h3>
+                    <p>View and manage your current medications</p>
+                </div>
+                <div class="card" onclick="showPatientFeature('medical-state')" style="background:linear-gradient(135deg,rgba(27,94,157,.15) 0%,rgba(173,216,230,.1) 100%);border:2px solid #87CEEB;cursor:pointer;">
+                    <div class="card-icon" style="background:#1B5E9D;">🏥</div>
+                    <h3>Medical State</h3>
+                    <p>View your health status and medicine effects</p>
+                </div>
+                <div class="card" onclick="showPatientFeature('interactions')" style="background:linear-gradient(135deg,rgba(27,94,157,.15) 0%,rgba(173,216,230,.1) 100%);border:2px solid #87CEEB;cursor:pointer;">
+                    <div class="card-icon" style="background:#1B5E9D;">🔍</div>
+                    <h3>Check Interactions</h3>
+                    <p>Verify interactions with your medications</p>
+                </div>
+            </div>
+
+            <div id="patientFeatureContent"></div>
+        </div>
+    `;
+}
+
 function showPatientFeature(feature) {
     const content = document.getElementById('patientFeatureContent');
     const meds    = parseMeds(currentUser?.medications);
 
     if (feature === 'medications') {
-        // Get vitamin warnings for current medications
         const vitaminWarnings = getVitaminWarningsForMeds(meds);
         
         let medsHTML = '';
@@ -921,303 +672,7 @@ async function checkNewDrugInteractions() {
 }
 
 // ============================================================
-//  GUEST MEDICAL PAGE (with autocomplete)
-// ============================================================
-
-function renderGuestMedical() {
-    return `
-        <div class="page-container">
-            <div class="dashboard-header">
-                <h1>Medical Team Access</h1>
-                <p>Professional tools for healthcare providers</p>
-            </div>
-
-            <!-- Tab Navigation -->
-            <div style="max-width:1280px;margin:0 auto 2rem auto;display:flex;gap:0.5rem;border-bottom:2px solid #e5e7eb;">
-                <button id="tabInteractionsBtn" onclick="switchMedicalTab('interactions')" style="padding:0.75rem 1.5rem;background:#1B5E9D;color:white;border:none;border-radius:0.5rem 0.5rem 0 0;font-weight:600;cursor:pointer;">💊 Drug Interaction Analyzer</button>
-                <button id="tabInfoBtn" onclick="switchMedicalTab('info')" style="padding:0.75rem 1.5rem;background:#f3f4f6;color:#4b5563;border:none;border-radius:0.5rem 0.5rem 0 0;font-weight:600;cursor:pointer;">📋 Drug Information Viewer</button>
-            </div>
-
-            <!-- Tab 1: Drug Interaction Analyzer -->
-            <div id="interactionsTab" style="display:block;">
-                <div style="max-width:800px;margin:0 auto;background:white;border-radius:1rem;padding:2rem;box-shadow:0 2px 8px rgba(0,0,0,.1);border:1px solid #e5e7eb;text-align:center;margin-bottom:2rem;">
-                    <p style="color:#4b5563;font-size:1.125rem;margin-bottom:1rem;">Welcome to PharmaLogic Medical Team Access</p>
-                    <p style="color:#4b5563;">Use our drug interaction checker to analyze medications for your patients. No registration required.</p>
-                </div>
-
-                <div class="interaction-checker">
-                    <h2>Drug Interaction Analyzer</h2>
-                    <p>Check for potential drug interactions</p>
-
-                    <div id="medCountSelector" style="margin-bottom:2rem;padding:1.5rem;background:#f9fafb;border-radius:.75rem;">
-                        <p style="font-weight:600;margin-bottom:1rem;color:#2d2d47;">How many medications?</p>
-                        <div style="display:flex;gap:2rem;justify-content:center;flex-wrap:wrap;">
-                            <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;">
-                                <input type="radio" name="medCount" value="2" checked onchange="showMedInputs()"> 2 medications
-                            </label>
-                            <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;">
-                                <input type="radio" name="medCount" value="more" onchange="showMedInputs()"> More than 2
-                            </label>
-                        </div>
-                    </div>
-
-                    <div id="twoMedInputs">
-                        <div class="checker-form">
-                            ${createAutocompleteInput('guestDrug1', 'First medication')}
-                            ${createAutocompleteInput('guestDrug2', 'Second medication')}
-                            <button id="guestAnalyzeBtn" onclick="checkGuestInteractions()" style="background:#1B5E9D;">Analyze</button>
-                        </div>
-                    </div>
-
-                    <div id="multiMedInputs" style="display:none;">
-                        <p style="margin-bottom:.75rem;color:#4b5563;">Enter all medications separated by commas:</p>
-                        <textarea id="guestDrugsList" rows="4" style="width:100%;padding:.75rem;border:2px solid #e5e7eb;border-radius:.5rem;margin-bottom:1rem;" placeholder="e.g., Aspirin, Metformin, Lisinopril"></textarea>
-                        <button id="guestMultiBtn" onclick="checkGuestMultiInteractions()" style="padding:.75rem 2rem;background:#1B5E9D;color:white;border:none;border-radius:.5rem;font-weight:600;cursor:pointer;">Analyze All</button>
-                    </div>
-
-                    <div id="guestResults"></div>
-                </div>
-            </div>
-
-            <!-- Tab 2: Drug Information Viewer -->
-            <div id="infoTab" style="display:none;">
-                <div class="interaction-checker">
-                    <h2>📋 Drug Information Viewer</h2>
-                    <p>Search for a medication to view comprehensive clinical information</p>
-
-                    <div class="checker-form">
-                        ${createAutocompleteInput('infoDrugName', 'Enter medication name (e.g., Metformin, Aspirin)')}
-                        <button id="infoSearchBtn" onclick="searchDrugInformation()" style="background:#1B5E9D;">Search</button>
-                    </div>
-
-                    <div id="drugInfoResults" style="margin-top:2rem;"></div>
-                </div>
-            </div>
-        </div>
-    `;
-}
-
-
-let currentMedicalTab = 'interactions';
-
-function switchMedicalTab(tab) {
-    currentMedicalTab = tab;
-    
-    const interactionsTab = document.getElementById('interactionsTab');
-    const infoTab = document.getElementById('infoTab');
-    const tabInteractionsBtn = document.getElementById('tabInteractionsBtn');
-    const tabInfoBtn = document.getElementById('tabInfoBtn');
-    
-    if (tab === 'interactions') {
-        interactionsTab.style.display = 'block';
-        infoTab.style.display = 'none';
-        tabInteractionsBtn.style.background = '#1B5E9D';
-        tabInteractionsBtn.style.color = 'white';
-        tabInfoBtn.style.background = '#f3f4f6';
-        tabInfoBtn.style.color = '#4b5563';
-    } else {
-        interactionsTab.style.display = 'none';
-        infoTab.style.display = 'block';
-        tabInteractionsBtn.style.background = '#f3f4f6';
-        tabInteractionsBtn.style.color = '#4b5563';
-        tabInfoBtn.style.background = '#1B5E9D';
-        tabInfoBtn.style.color = 'white';
-        
-        // Initialize autocomplete for the info tab
-        setTimeout(async () => {
-            const drugs = await getDrugList();
-            setupAutocomplete('infoDrugName', drugs);
-        }, 100);
-    }
-}
-
-
-
-
-async function searchDrugInformation() {
-    const drugName = document.getElementById('infoDrugName').value.trim();
-    const resultsDiv = document.getElementById('drugInfoResults');
-    
-    if (!drugName) {
-        showToast('Please enter a medication name', 'warning');
-        return;
-    }
-    
-    resultsDiv.innerHTML = '<p style="text-align:center;color:#4b5563;">⏳ Loading drug information...</p>';
-    
-    try {
-        // First, search for the drug in the database
-        const drugs = await apiFetch('/drugs');
-        const foundDrug = drugs.find(d => d.name.toLowerCase() === drugName.toLowerCase());
-        
-        if (!foundDrug) {
-            resultsDiv.innerHTML = `
-                <div style="background:#fef2f2;border:2px solid #dc2626;border-radius:.75rem;padding:1.5rem;text-align:center;">
-                    <h3 style="color:#dc2626;">⚠️ Drug Not Found</h3>
-                    <p style="color:#4b5563;">"${drugName}" is not in our database. Please check the spelling or try another medication.</p>
-                    <p style="font-size:.875rem;color:#6b7280;margin-top:1rem;">Available drugs: Aspirin, Metformin, Warfarin, Lisinopril, Omeprazole, Amoxicillin, and more.</p>
-                </div>
-            `;
-            return;
-        }
-        
-        // Get detailed information
-        const detailedInfo = await apiFetch(`/drugs/${foundDrug.id}/detailed`);
-        
-        resultsDiv.innerHTML = renderDrugInformation(detailedInfo);
-        
-    } catch (err) {
-        resultsDiv.innerHTML = `
-            <div style="background:#fee2e2;border:2px solid #dc2626;border-radius:.75rem;padding:1.5rem;text-align:center;">
-                <h3 style="color:#dc2626;">⚠️ Error Loading Information</h3>
-                <p style="color:#4b5563;">${getProfessionalErrorMessage(err)}</p>
-            </div>
-        `;
-    }
-}
-
-
-function renderDrugInformation(drug) {
-    return `
-        <div style="background:white;border-radius:1rem;box-shadow:0 4px 12px rgba(0,0,0,0.1);overflow:hidden;">
-            <!-- Header -->
-            <div style="background:linear-gradient(135deg,#1B5E9D,#FF8C00);padding:1.5rem;color:white;">
-                <h2 style="margin:0;font-size:1.75rem;">💊 ${drug.name}</h2>
-                <p style="margin:.5rem 0 0;opacity:0.9;">${drug.description || 'No description available'}</p>
-            </div>
-            
-            <div style="padding:1.5rem;">
-                <!-- Common Uses -->
-                <div style="margin-bottom:1.5rem;padding:1rem;background:#f0fdf4;border-radius:.75rem;border-left:4px solid #16a34a;">
-                    <h3 style="color:#16a34a;margin:0 0 .5rem 0;">💊 Common Uses</h3>
-                    <ul style="margin:0;padding-left:1.25rem;">
-                        ${drug.common_uses.map(use => `<li style="margin-bottom:.25rem;">${use}</li>`).join('')}
-                    </ul>
-                </div>
-                
-                <!-- Side Effects -->
-                <div style="margin-bottom:1.5rem;padding:1rem;background:#fffbeb;border-radius:.75rem;border-left:4px solid #d97706;">
-                    <h3 style="color:#d97706;margin:0 0 .5rem 0;">⚠️ Common Side Effects</h3>
-                    <ul style="margin:0;padding-left:1.25rem;">
-                        ${drug.side_effects.map(effect => `<li style="margin-bottom:.25rem;">${effect}</li>`).join('')}
-                    </ul>
-                </div>
-                
-                <!-- Contraindications -->
-                <div style="margin-bottom:1.5rem;padding:1rem;background:#fef2f2;border-radius:.75rem;border-left:4px solid #dc2626;">
-                    <h3 style="color:#dc2626;margin:0 0 .5rem 0;">🚫 Contraindications</h3>
-                    <ul style="margin:0;padding-left:1.25rem;">
-                        ${drug.contraindications.map(ci => `<li style="margin-bottom:.25rem;">${ci}</li>`).join('')}
-                    </ul>
-                </div>
-                
-                <!-- Drug Interactions -->
-                ${drug.interactions && drug.interactions.length > 0 ? `
-                <div style="margin-bottom:1.5rem;padding:1rem;background:#eff6ff;border-radius:.75rem;border-left:4px solid #3b82f6;">
-                    <h3 style="color:#3b82f6;margin:0 0 .5rem 0;">💊 Drug Interactions</h3>
-                    <ul style="margin:0;padding-left:1.25rem;">
-                        ${drug.interactions.map(interaction => `
-                            <li style="margin-bottom:.5rem;">
-                                <strong>${interaction.drug}</strong> (${interaction.severity} severity)<br>
-                                <span style="font-size:.875rem;color:#4b5563;">${interaction.description}</span>
-                            </li>
-                        `).join('')}
-                    </ul>
-                </div>
-                ` : ''}
-                
-                <!-- Vitamin Depletions -->
-                ${drug.vitamin_depletions && drug.vitamin_depletions.length > 0 ? `
-                <div style="margin-bottom:1.5rem;padding:1rem;background:#f3e8ff;border-radius:.75rem;border-left:4px solid #9333ea;">
-                    <h3 style="color:#9333ea;margin:0 0 .5rem 0;">🧪 Vitamin/Nutrient Depletions</h3>
-                    <ul style="margin:0;padding-left:1.25rem;">
-                        ${drug.vitamin_depletions.map(vd => `<li style="margin-bottom:.25rem;">${vd}</li>`).join('')}
-                    </ul>
-                </div>
-                ` : ''}
-                
-                <!-- Pregnancy & Lactation -->
-                <div style="margin-bottom:1.5rem;padding:1rem;background:#fef3c7;border-radius:.75rem;border-left:4px solid #f59e0b;">
-                    <h3 style="color:#f59e0b;margin:0 0 .5rem 0;">📋 Pregnancy & Lactation</h3>
-                    <p style="margin:0;">${drug.pregnancy_safety}</p>
-                </div>
-                
-                <!-- Counseling Points -->
-                <div style="margin-bottom:1.5rem;padding:1rem;background:#f0fdf4;border-radius:.75rem;border-left:4px solid #10b981;">
-                    <h3 style="color:#10b981;margin:0 0 .5rem 0;">💡 Key Counseling Points</h3>
-                    <ul style="margin:0;padding-left:1.25rem;">
-                        ${drug.counseling_points.map(point => `<li style="margin-bottom:.25rem;">${point}</li>`).join('')}
-                    </ul>
-                </div>
-                
-                <!-- References -->
-                <div style="padding:1rem;background:#f3f4f6;border-radius:.75rem;">
-                    <h3 style="color:#4b5563;margin:0 0 .5rem 0;">🔗 References</h3>
-                    <ul style="margin:0;padding-left:1.25rem;">
-                        ${drug.references.map(ref => `<li style="margin-bottom:.25rem;font-size:.875rem;">${ref}</li>`).join('')}
-                    </ul>
-                    <p style="font-size:.75rem;color:#9ca3af;margin-top:1rem;">⚠️ For professional reference only. Not a substitute for clinical judgment.</p>
-                </div>
-            </div>
-        </div>
-    `;
-}
-
-function showMedInputs() {
-    const selected = document.querySelector('input[name="medCount"]:checked').value;
-    document.getElementById('twoMedInputs').style.display   = selected === '2'    ? 'block' : 'none';
-    document.getElementById('multiMedInputs').style.display = selected === 'more' ? 'block' : 'none';
-    document.getElementById('guestResults').innerHTML = '';
-}
-
-async function checkGuestInteractions() {
-    const d1  = document.getElementById('guestDrug1').value.trim();
-    const d2  = document.getElementById('guestDrug2').value.trim();
-    const btn = document.getElementById('guestAnalyzeBtn');
-    if (!d1 || !d2) { showToast('Please enter both medications', 'warning'); return; }
-
-    btn.disabled = true;
-    btn.textContent = 'Analyzing…';
-    await runGuestAnalysis([d1, d2]);
-    btn.disabled    = false;
-    btn.textContent = 'Analyze';
-}
-
-async function checkGuestMultiInteractions() {
-    const val = document.getElementById('guestDrugsList').value;
-    const btn = document.getElementById('guestMultiBtn');
-    const drugs = val.split(',').map(d => d.trim()).filter(d => d);
-    if (drugs.length < 2) { showToast('Please enter at least two medications', 'warning'); return; }
-
-    btn.disabled    = true;
-    btn.textContent = 'Analyzing…';
-    await runGuestAnalysis(drugs);
-    btn.disabled    = false;
-    btn.textContent = 'Analyze All';
-}
-
-async function runGuestAnalysis(drugs) {
-    const div = document.getElementById('guestResults');
-    div.innerHTML = '<p style="color:#4b5563;margin-top:1rem;">⏳ Querying database…</p>';
-    try {
-        const data = await apiFetch('/analyze', {
-            method : 'POST',
-            body   : JSON.stringify({ drugs }),
-        });
-        div.innerHTML = renderAnalysisResult(data);
-    } catch (err) {
-        div.innerHTML = `
-            <div class="results severe" style="margin-top:1.5rem;">
-                <h3>⚠️ Unable to Complete Analysis</h3>
-                <p>${getProfessionalErrorMessage(err)}</p>
-                <p style="font-size:.875rem;margin-top:.5rem;">Need help? Contact our support team at support@pharmalogic.com</p>
-            </div>
-        `;
-    }
-}
-
-// ============================================================
-//  MEDICAL PROFESSIONAL DASHBOARD
+//  Medical Dashboard Functions
 // ============================================================
 
 function renderMedicalDashboard() {
@@ -1341,7 +796,355 @@ async function runMedAnalysis(drugs) {
 }
 
 // ============================================================
-//  SHARED ANALYSIS RESULT RENDERER (with allergy + vitamin warnings)
+//  Guest Medical Page Functions
+// ============================================================
+
+function renderGuestMedical() {
+    return `
+        <div class="page-container">
+            <div class="dashboard-header">
+                <h1>Medical Team Access</h1>
+                <p>Professional tools for healthcare providers</p>
+            </div>
+
+            <div style="max-width:1280px;margin:0 auto 2rem auto;display:flex;gap:0.5rem;border-bottom:2px solid #e5e7eb;">
+                <button id="tabInteractionsBtn" onclick="switchMedicalTab('interactions')" style="padding:0.75rem 1.5rem;background:#1B5E9D;color:white;border:none;border-radius:0.5rem 0.5rem 0 0;font-weight:600;cursor:pointer;">💊 Drug Interaction Analyzer</button>
+                <button id="tabInfoBtn" onclick="switchMedicalTab('info')" style="padding:0.75rem 1.5rem;background:#f3f4f6;color:#4b5563;border:none;border-radius:0.5rem 0.5rem 0 0;font-weight:600;cursor:pointer;">📋 Drug Information Viewer</button>
+            </div>
+
+            <div id="interactionsTab" style="display:block;">
+                <div style="max-width:800px;margin:0 auto;background:white;border-radius:1rem;padding:2rem;box-shadow:0 2px 8px rgba(0,0,0,.1);border:1px solid #e5e7eb;text-align:center;margin-bottom:2rem;">
+                    <p style="color:#4b5563;font-size:1.125rem;margin-bottom:1rem;">Welcome to PharmaLogic Medical Team Access</p>
+                    <p style="color:#4b5563;">Use our drug interaction checker to analyze medications for your patients. No registration required.</p>
+                </div>
+
+                <div class="interaction-checker">
+                    <h2>Drug Interaction Analyzer</h2>
+                    <p>Check for potential drug interactions</p>
+
+                    <div id="medCountSelector" style="margin-bottom:2rem;padding:1.5rem;background:#f9fafb;border-radius:.75rem;">
+                        <p style="font-weight:600;margin-bottom:1rem;color:#2d2d47;">How many medications?</p>
+                        <div style="display:flex;gap:2rem;justify-content:center;flex-wrap:wrap;">
+                            <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;">
+                                <input type="radio" name="medCount" value="2" checked onchange="showMedInputs()"> 2 medications
+                            </label>
+                            <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;">
+                                <input type="radio" name="medCount" value="more" onchange="showMedInputs()"> More than 2
+                            </label>
+                        </div>
+                    </div>
+
+                    <div id="twoMedInputs">
+                        <div class="checker-form">
+                            ${createAutocompleteInput('guestDrug1', 'First medication')}
+                            ${createAutocompleteInput('guestDrug2', 'Second medication')}
+                            <button id="guestAnalyzeBtn" onclick="checkGuestInteractions()" style="background:#1B5E9D;">Analyze</button>
+                        </div>
+                    </div>
+
+                    <div id="multiMedInputs" style="display:none;">
+                        <p style="margin-bottom:.75rem;color:#4b5563;">Enter all medications separated by commas:</p>
+                        <textarea id="guestDrugsList" rows="4" style="width:100%;padding:.75rem;border:2px solid #e5e7eb;border-radius:.5rem;margin-bottom:1rem;" placeholder="e.g., Aspirin, Metformin, Lisinopril"></textarea>
+                        <button id="guestMultiBtn" onclick="checkGuestMultiInteractions()" style="padding:.75rem 2rem;background:#1B5E9D;color:white;border:none;border-radius:.5rem;font-weight:600;cursor:pointer;">Analyze All</button>
+                    </div>
+
+                    <div id="guestResults"></div>
+                </div>
+            </div>
+
+            <div id="infoTab" style="display:none;">
+                <div class="interaction-checker">
+                    <h2>📋 Drug Information Viewer</h2>
+                    <p>Search for a medication to view comprehensive clinical information</p>
+
+                    <div class="checker-form">
+                        ${createAutocompleteInput('infoDrugName', 'Enter medication name (e.g., Metformin, Aspirin)')}
+                        <button id="infoSearchBtn" onclick="searchDrugInformation()" style="background:#1B5E9D;">Search</button>
+                    </div>
+
+                    <div id="drugInfoResults" style="margin-top:2rem;"></div>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+let currentMedicalTab = 'interactions';
+
+function switchMedicalTab(tab) {
+    currentMedicalTab = tab;
+    
+    const interactionsTab = document.getElementById('interactionsTab');
+    const infoTab = document.getElementById('infoTab');
+    const tabInteractionsBtn = document.getElementById('tabInteractionsBtn');
+    const tabInfoBtn = document.getElementById('tabInfoBtn');
+    
+    if (tab === 'interactions') {
+        interactionsTab.style.display = 'block';
+        infoTab.style.display = 'none';
+        tabInteractionsBtn.style.background = '#1B5E9D';
+        tabInteractionsBtn.style.color = 'white';
+        tabInfoBtn.style.background = '#f3f4f6';
+        tabInfoBtn.style.color = '#4b5563';
+    } else {
+        interactionsTab.style.display = 'none';
+        infoTab.style.display = 'block';
+        tabInteractionsBtn.style.background = '#f3f4f6';
+        tabInteractionsBtn.style.color = '#4b5563';
+        tabInfoBtn.style.background = '#1B5E9D';
+        tabInfoBtn.style.color = 'white';
+        
+        setTimeout(async () => {
+            const drugs = await getDrugList();
+            setupAutocomplete('infoDrugName', drugs);
+        }, 100);
+    }
+}
+
+async function searchDrugInformation() {
+    const drugName = document.getElementById('infoDrugName').value.trim();
+    const resultsDiv = document.getElementById('drugInfoResults');
+    
+    if (!drugName) {
+        showToast('Please enter a medication name', 'warning');
+        return;
+    }
+    
+    resultsDiv.innerHTML = '<p style="text-align:center;color:#4b5563;">⏳ Loading drug information...</p>';
+    
+    try {
+        const drugs = await apiFetch('/drugs');
+        const foundDrug = drugs.find(d => d.name.toLowerCase() === drugName.toLowerCase());
+        
+        if (!foundDrug) {
+            resultsDiv.innerHTML = `
+                <div style="background:#fef2f2;border:2px solid #dc2626;border-radius:.75rem;padding:1.5rem;text-align:center;">
+                    <h3 style="color:#dc2626;">⚠️ Drug Not Found</h3>
+                    <p style="color:#4b5563;">"${drugName}" is not in our database. Please check the spelling or try another medication.</p>
+                    <p style="font-size:.875rem;color:#6b7280;margin-top:1rem;">Available drugs: Aspirin, Metformin, Warfarin, Lisinopril, Omeprazole, Amoxicillin, and more.</p>
+                </div>
+            `;
+            return;
+        }
+        
+        const detailedInfo = await apiFetch(`/drugs/${foundDrug.id}/detailed`);
+        resultsDiv.innerHTML = renderDrugInformation(detailedInfo);
+        
+    } catch (err) {
+        resultsDiv.innerHTML = `
+            <div style="background:#fee2e2;border:2px solid #dc2626;border-radius:.75rem;padding:1.5rem;text-align:center;">
+                <h3 style="color:#dc2626;">⚠️ Error Loading Information</h3>
+                <p style="color:#4b5563;">${getProfessionalErrorMessage(err)}</p>
+            </div>
+        `;
+    }
+}
+
+function renderDrugInformation(drug) {
+    return `
+        <div style="background:white;border-radius:1rem;box-shadow:0 4px 12px rgba(0,0,0,0.1);overflow:hidden;">
+            <div style="background:linear-gradient(135deg,#1B5E9D,#FF8C00);padding:1.5rem;color:white;">
+                <h2 style="margin:0;font-size:1.75rem;">💊 ${drug.name}</h2>
+                <p style="margin:.5rem 0 0;opacity:0.9;">${drug.description || 'No description available'}</p>
+            </div>
+            
+            <div style="padding:1.5rem;">
+                <div style="margin-bottom:1.5rem;padding:1rem;background:#f0fdf4;border-radius:.75rem;border-left:4px solid #16a34a;">
+                    <h3 style="color:#16a34a;margin:0 0 .5rem 0;">💊 Common Uses</h3>
+                    <ul style="margin:0;padding-left:1.25rem;">
+                        ${drug.common_uses.map(use => `<li style="margin-bottom:.25rem;">${use}</li>`).join('')}
+                    </ul>
+                </div>
+                
+                <div style="margin-bottom:1.5rem;padding:1rem;background:#fffbeb;border-radius:.75rem;border-left:4px solid #d97706;">
+                    <h3 style="color:#d97706;margin:0 0 .5rem 0;">⚠️ Common Side Effects</h3>
+                    <ul style="margin:0;padding-left:1.25rem;">
+                        ${drug.side_effects.map(effect => `<li style="margin-bottom:.25rem;">${effect}</li>`).join('')}
+                    </ul>
+                </div>
+                
+                <div style="margin-bottom:1.5rem;padding:1rem;background:#fef2f2;border-radius:.75rem;border-left:4px solid #dc2626;">
+                    <h3 style="color:#dc2626;margin:0 0 .5rem 0;">🚫 Contraindications</h3>
+                    <ul style="margin:0;padding-left:1.25rem;">
+                        ${drug.contraindications.map(ci => `<li style="margin-bottom:.25rem;">${ci}</li>`).join('')}
+                    </ul>
+                </div>
+                
+                ${drug.interactions && drug.interactions.length > 0 ? `
+                <div style="margin-bottom:1.5rem;padding:1rem;background:#eff6ff;border-radius:.75rem;border-left:4px solid #3b82f6;">
+                    <h3 style="color:#3b82f6;margin:0 0 .5rem 0;">💊 Drug Interactions</h3>
+                    <ul style="margin:0;padding-left:1.25rem;">
+                        ${drug.interactions.map(interaction => `
+                            <li style="margin-bottom:.5rem;">
+                                <strong>${interaction.drug}</strong> (${interaction.severity} severity)<br>
+                                <span style="font-size:.875rem;color:#4b5563;">${interaction.description}</span>
+                            </li>
+                        `).join('')}
+                    </ul>
+                </div>
+                ` : ''}
+                
+                ${drug.vitamin_depletions && drug.vitamin_depletions.length > 0 ? `
+                <div style="margin-bottom:1.5rem;padding:1rem;background:#f3e8ff;border-radius:.75rem;border-left:4px solid #9333ea;">
+                    <h3 style="color:#9333ea;margin:0 0 .5rem 0;">🧪 Vitamin/Nutrient Depletions</h3>
+                    <ul style="margin:0;padding-left:1.25rem;">
+                        ${drug.vitamin_depletions.map(vd => `<li style="margin-bottom:.25rem;">${vd}</li>`).join('')}
+                    </ul>
+                </div>
+                ` : ''}
+                
+                <div style="margin-bottom:1.5rem;padding:1rem;background:#fef3c7;border-radius:.75rem;border-left:4px solid #f59e0b;">
+                    <h3 style="color:#f59e0b;margin:0 0 .5rem 0;">📋 Pregnancy & Lactation</h3>
+                    <p style="margin:0;">${drug.pregnancy_safety}</p>
+                </div>
+                
+                <div style="margin-bottom:1.5rem;padding:1rem;background:#f0fdf4;border-radius:.75rem;border-left:4px solid #10b981;">
+                    <h3 style="color:#10b981;margin:0 0 .5rem 0;">💡 Key Counseling Points</h3>
+                    <ul style="margin:0;padding-left:1.25rem;">
+                        ${drug.counseling_points.map(point => `<li style="margin-bottom:.25rem;">${point}</li>`).join('')}
+                    </ul>
+                </div>
+                
+                <div style="padding:1rem;background:#f3f4f6;border-radius:.75rem;">
+                    <h3 style="color:#4b5563;margin:0 0 .5rem 0;">🔗 References</h3>
+                    <ul style="margin:0;padding-left:1.25rem;">
+                        ${drug.references.map(ref => `<li style="margin-bottom:.25rem;font-size:.875rem;">${ref}</li>`).join('')}
+                    </ul>
+                    <p style="font-size:.75rem;color:#9ca3af;margin-top:1rem;">⚠️ For professional reference only. Not a substitute for clinical judgment.</p>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function showMedInputs() {
+    const selected = document.querySelector('input[name="medCount"]:checked').value;
+    document.getElementById('twoMedInputs').style.display   = selected === '2'    ? 'block' : 'none';
+    document.getElementById('multiMedInputs').style.display = selected === 'more' ? 'block' : 'none';
+    document.getElementById('guestResults').innerHTML = '';
+}
+
+async function checkGuestInteractions() {
+    const d1  = document.getElementById('guestDrug1').value.trim();
+    const d2  = document.getElementById('guestDrug2').value.trim();
+    const btn = document.getElementById('guestAnalyzeBtn');
+    if (!d1 || !d2) { showToast('Please enter both medications', 'warning'); return; }
+
+    btn.disabled = true;
+    btn.textContent = 'Analyzing…';
+    await runGuestAnalysis([d1, d2]);
+    btn.disabled    = false;
+    btn.textContent = 'Analyze';
+}
+
+async function checkGuestMultiInteractions() {
+    const val = document.getElementById('guestDrugsList').value;
+    const btn = document.getElementById('guestMultiBtn');
+    const drugs = val.split(',').map(d => d.trim()).filter(d => d);
+    if (drugs.length < 2) { showToast('Please enter at least two medications', 'warning'); return; }
+
+    btn.disabled    = true;
+    btn.textContent = 'Analyzing…';
+    await runGuestAnalysis(drugs);
+    btn.disabled    = false;
+    btn.textContent = 'Analyze All';
+}
+
+async function runGuestAnalysis(drugs) {
+    const div = document.getElementById('guestResults');
+    div.innerHTML = '<p style="color:#4b5563;margin-top:1rem;">⏳ Querying database…</p>';
+    try {
+        const data = await apiFetch('/analyze', {
+            method : 'POST',
+            body   : JSON.stringify({ drugs }),
+        });
+        div.innerHTML = renderAnalysisResult(data);
+    } catch (err) {
+        div.innerHTML = `
+            <div class="results severe" style="margin-top:1.5rem;">
+                <h3>⚠️ Unable to Complete Analysis</h3>
+                <p>${getProfessionalErrorMessage(err)}</p>
+                <p style="font-size:.875rem;margin-top:.5rem;">Need help? Contact our support team at support@pharmalogic.com</p>
+            </div>
+        `;
+    }
+}
+
+// ============================================================
+//  Autocomplete Functions
+// ============================================================
+
+async function getDrugList() {
+    if (drugCache) return drugCache;
+    
+    try {
+        const drugs = await apiFetch('/drugs');
+        drugCache = drugs.map(d => d.name);
+        return drugCache;
+    } catch (err) {
+        console.error('Failed to fetch drugs:', err);
+        return [];
+    }
+}
+
+function createAutocompleteInput(inputId, placeholder) {
+    return `
+        <div class="autocomplete-container" style="position:relative;width:100%;">
+            <input type="text" id="${inputId}" placeholder="${placeholder}" autocomplete="off">
+            <div id="${inputId}-suggestions" class="autocomplete-suggestions" style="display:none;position:absolute;top:100%;left:0;right:0;background:white;border:1px solid #e5e7eb;border-radius:.5rem;max-height:200px;overflow-y:auto;z-index:1000;box-shadow:0 4px 6px rgba(0,0,0,0.1);"></div>
+        </div>
+    `;
+}
+
+function setupAutocomplete(inputId, drugList) {
+    const input = document.getElementById(inputId);
+    const suggestionsDiv = document.getElementById(`${inputId}-suggestions`);
+    if (!input || !suggestionsDiv) return;
+
+    const showSuggestions = (filter) => {
+        const filtered = drugList.filter(d => 
+            d.toLowerCase().includes(filter.toLowerCase())
+        ).slice(0, 8);
+
+        if (filtered.length > 0 && filter.length >= 2) {
+            suggestionsDiv.innerHTML = filtered.map(d => 
+                `<div style="padding:.75rem;cursor:pointer;border-bottom:1px solid #f3f4f6;transition:background 0.2s;" 
+                      onmouseover="this.style.backgroundColor='#f3f4f6'" 
+                      onmouseout="this.style.backgroundColor='white'"
+                      onclick="document.getElementById('${inputId}').value='${d.replace(/'/g, "\\'")}'; document.getElementById('${inputId}-suggestions').style.display='none';">
+                    ${d}
+                </div>`
+            ).join('');
+            suggestionsDiv.style.display = 'block';
+        } else {
+            suggestionsDiv.style.display = 'none';
+        }
+    };
+
+    input.addEventListener('input', (e) => {
+        const value = e.target.value.trim();
+        if (value.length >= 2) {
+            showSuggestions(value);
+        } else {
+            suggestionsDiv.style.display = 'none';
+        }
+    });
+
+    input.addEventListener('blur', () => {
+        setTimeout(() => {
+            suggestionsDiv.style.display = 'none';
+        }, 200);
+    });
+}
+
+async function initAutocompleteForGuest() {
+    const drugs = await getDrugList();
+    setupAutocomplete('guestDrug1', drugs);
+    setupAutocomplete('guestDrug2', drugs);
+}
+
+// ============================================================
+//  Analysis Result Functions
 // ============================================================
 
 function renderAnalysisResult(data, highlightDrug = null) {
@@ -1349,7 +1152,6 @@ function renderAnalysisResult(data, highlightDrug = null) {
     console.log("🚨 allergy_warnings value:", data.allergy_warnings);
     console.log("🚨 vitamin_warnings value:", data.vitamin_warnings);
     
-    // التأكد من وجود risk_percentage
     let risk_percentage = data.risk_percentage;
     if (risk_percentage === undefined || risk_percentage === null) {
         const riskLevel = data.risk_level;
@@ -1371,7 +1173,6 @@ function renderAnalysisResult(data, highlightDrug = null) {
 
     let html = `
         <div style="margin-top:1.5rem;">
-            <!-- Risk banner with percentage -->
             <div style="padding:1.25rem;background:${rc.bg};border:2px solid ${rc.border};border-radius:.75rem;margin-bottom:1.5rem;">
                 <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap;">
                     <span style="font-size:2rem;">${rc.icon}</span>
@@ -1394,7 +1195,6 @@ function renderAnalysisResult(data, highlightDrug = null) {
             </div>
     `;
     
-    // ========== عرض تحذيرات الحساسية ==========
     if (data.allergy_warnings && data.allergy_warnings.length > 0) {
         html += `
             <div style="background:#fee2e2;border:2px solid #dc2626;border-radius:.75rem;padding:1.25rem;margin-bottom:1.5rem;">
@@ -1407,7 +1207,6 @@ function renderAnalysisResult(data, highlightDrug = null) {
         `;
     }
     
-    // ========== عرض تحذيرات نقص الفيتامينات ==========
     if (data.vitamin_warnings && data.vitamin_warnings.length > 0) {
         html += `
             <div style="background:#eff6ff;border:2px solid #3b82f6;border-radius:.75rem;padding:1.25rem;margin-bottom:1.5rem;">
@@ -1424,7 +1223,6 @@ function renderAnalysisResult(data, highlightDrug = null) {
         `;
     }
     
-    // ========== عرض التفاعلات ==========
     if (interactions.length > 0) {
         html += `
             <h3 style="color:#1B5E9D;margin-bottom:1rem;">Interactions Detected (${interactions.length})</h3>
@@ -1447,7 +1245,6 @@ function renderAnalysisResult(data, highlightDrug = null) {
         html += `<p style="color:#4b5563;font-style:italic;margin-bottom:1.5rem;">No interactions found in the database for the entered medications.</p>`;
     }
     
-    // ========== عرض تحذيرات المختبر ==========
     if (lab_alerts && lab_alerts.length > 0) {
         html += `
             <div style="background:#eff6ff;border:2px solid #3b82f6;border-radius:.75rem;padding:1.25rem;margin-bottom:1.5rem;">
@@ -1474,10 +1271,6 @@ function addExportButton(container) {
     btn.onclick     = exportToPDF;
     container.appendChild(btn);
 }
-
-// ============================================================
-//  PDF EXPORT
-// ============================================================
 
 function exportToPDF() {
     if (!lastInteractionResults) { showToast('No interaction results to export', 'warning'); return; }
@@ -1559,8 +1352,222 @@ ${lab_alerts && lab_alerts.length ? `
 }
 
 // ============================================================
-//  ABOUT PAGE
+//  Page Render Functions (Home, Login, Signup, About)
 // ============================================================
+
+function renderHome() {
+    return `
+        <div class="page-container">
+            <div class="hero">
+                <div class="hero-content">
+                    <div class="badge"><span>Smart Drug Interaction Analysis</span></div>
+                    <h1>Safer Prescriptions, <span class="highlight">Smarter Care</span></h1>
+                    <p>PharmaLogic uses intelligent analysis to detect potential drug interactions instantly, helping healthcare professionals and patients make informed medication decisions.</p>
+                    <div class="hero-buttons">
+                        <button class="btn btn-primary" onclick="navigateTo('signup')">Get Started →</button>
+                        <button class="btn btn-secondary" onclick="navigateTo('login')">Sign In</button>
+                    </div>
+                </div>
+                <div class="hero-visual">
+                    <div class="hero-card">
+                        <div>
+                            <div class="hero-icon icon-green">✓</div>
+                            <div>
+                                <h3>Safe Interaction Check</h3>
+                                <p>Instant analysis of drug combinations</p>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="hero-icon icon-amber">!</div>
+                            <div>
+                                <h3>Risk Assessment</h3>
+                                <p>Clear risk levels and explanations</p>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="hero-icon icon-blue">📄</div>
+                            <div>
+                                <h3>PDF Reports</h3>
+                                <p>Export data for healthcare professionals</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <section class="user-types">
+                <div class="user-types-container">
+                    <div class="section-header">
+                        <h2>Built for Every Role</h2>
+                        <p>Tailored interfaces for patients and healthcare professionals</p>
+                    </div>
+                    <div class="user-grid">
+                        <div class="user-card patient">
+                            <div class="user-card-icon">👤</div>
+                            <h3>For Patients</h3>
+                            <p>Manage your medications and check for potential interactions with your current prescriptions.</p>
+                            <ul class="user-features">
+                                <li><span class="checkmark">✓</span> Personal medication history</li>
+                                <li><span class="checkmark">✓</span> Real-time interaction checking</li>
+                                <li><span class="checkmark">✓</span> PDF export functionality</li>
+                            </ul>
+                        </div>
+                        <div class="user-card doctor">
+                            <div class="user-card-icon">⚕️</div>
+                            <h3>For Medical Professionals</h3>
+                            <p>Fast and reliable medical analysis to search for drug interactions and enhance clinical decisions.</p>
+                            <ul class="user-features">
+                                <li><span class="checkmark">✓</span> Fast interaction search</li>
+                                <li><span class="checkmark">✓</span> Reliable medical analysis</li>
+                                <li><span class="checkmark">✓</span> Enhanced clinical knowledge</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="features" id="features">
+                <div class="features-container">
+                    <div class="section-header">
+                        <h2>Powerful Features</h2>
+                        <p>Everything you need for safe medication management</p>
+                    </div>
+                    <div class="features-grid">
+                        <div class="feature-item">
+                            <div class="feature-icon blue">⚡</div>
+                            <div><h3>Instant Analysis</h3><p>Real-time interaction checks powered by your database</p></div>
+                        </div>
+                        <div class="feature-item">
+                            <div class="feature-icon teal">🔒</div>
+                            <div><h3>Secure & Private</h3><p>JWT-secured with strict role-based access controls</p></div>
+                        </div>
+                        <div class="feature-item">
+                            <div class="feature-icon blue">📊</div>
+                            <div><h3>Reliable Medical Analysis</h3><p>Comprehensive rules engine with lab alert system</p></div>
+                        </div>
+                        <div class="feature-item">
+                            <div class="feature-icon teal">📋</div>
+                            <div><h3>Report Export</h3><p>Download and share comprehensive PDF reports</p></div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="cta">
+                <div class="cta-container">
+                    <h2>Ready to Get Started?</h2>
+                    <p>Join patients and healthcare professionals who trust PharmaLogic for safer prescriptions</p>
+                    <button class="btn btn-primary" onclick="navigateTo('signup')" style="background:white;color:#2B8EFF;">Create Your Account →</button>
+                </div>
+            </section>
+        </div>
+    `;
+}
+
+function renderLogin() {
+    return `
+        <div class="page-container">
+            <div class="form-container">
+                <h1>Welcome Back</h1>
+                <p>Sign in to your PharmaLogic account to continue</p>
+
+                <form id="loginForm" onsubmit="handleLogin(event)">
+                    <div class="form-group">
+                        <label for="loginEmail">Email Address</label>
+                        <input type="email" id="loginEmail" placeholder="you@example.com" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="loginPassword">Password</label>
+                        <input type="password" id="loginPassword" placeholder="••••••••" required>
+                    </div>
+
+                    <div id="loginError" style="display:none;color:#dc2626;background:#fef2f2;padding:.75rem;border-radius:.5rem;margin-bottom:1rem;font-size:.9rem;"></div>
+
+                    <button type="submit" class="form-button" id="loginBtn">Sign In</button>
+                </form>
+
+                <div class="signup-link">
+                    Don't have an account? <a onclick="navigateTo('signup'); return false;">Create one now</a>
+                </div>
+                <button class="back-button" onclick="navigateTo('home')" style="margin-top:1rem;">← Back to Home</button>
+            </div>
+        </div>
+    `;
+}
+
+function renderSignup() {
+    return `
+        <div class="page-container">
+            <div class="form-container">
+                <h1>Create Account</h1>
+                <p>Join PharmaLogic to check drug interactions safely</p>
+
+                <form id="signupForm" onsubmit="handleSignup(event)">
+                    <input type="hidden" id="selectedRole" value="patient">
+
+                    <div class="form-group">
+                        <label for="fullName">Full Name</label>
+                        <input type="text" id="fullName" placeholder="John Doe" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="signupEmail">Email Address</label>
+                        <input type="email" id="signupEmail" placeholder="you@example.com" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="signupPassword">Password</label>
+                        <input type="password" id="signupPassword" placeholder="••••••••" required minlength="6">
+                    </div>
+                    <div class="form-group">
+                        <label for="confirmPassword">Confirm Password</label>
+                        <input type="password" id="confirmPassword" placeholder="••••••••" required>
+                    </div>
+
+                    <div id="patientFields">
+                        <div class="form-group">
+                            <label for="age">Age</label>
+                            <input type="number" id="age" placeholder="30" min="1" max="130">
+                        </div>
+                        <div class="form-group">
+                            <label for="gender">Gender</label>
+                            <select id="gender">
+                                <option value="">Select gender</option>
+                                <option value="male">Male</option>
+                                <option value="female">Female</option>
+                                <option value="other">Other</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="medicalConditions">Chronic Conditions (comma-separated)</label>
+                            <input type="text" id="medicalConditions" placeholder="e.g., Diabetes, Hypertension">
+                        </div>
+                        <div class="form-group">
+                            <label for="allergies">Allergies (comma-separated)</label>
+                            <input type="text" id="allergies" placeholder="e.g., Penicillin, Aspirin">
+                        </div>
+                        <div class="form-group">
+                            <label for="currentMedications">Current Medications (comma-separated)</label>
+                            <input type="text" id="currentMedications" placeholder="e.g., Aspirin, Metformin">
+                        </div>
+                    </div>
+
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="termsAgree" required>
+                        <label for="termsAgree">I agree to the <a href="#" onclick="showTermsOfService(); return false;">Terms of Service</a> and <a href="#" onclick="showPrivacyPolicy(); return false;">Privacy Policy</a></label>
+                    </div>
+
+                    <div id="signupError" style="display:none;color:#dc2626;background:#fef2f2;padding:.75rem;border-radius:.5rem;margin-bottom:1rem;font-size:.9rem;"></div>
+
+                    <button type="submit" class="form-button" id="signupBtn">Create Account</button>
+                </form>
+
+                <div class="signup-link">
+                    Already have an account? <a onclick="navigateTo('login'); return false;">Sign in here</a>
+                </div>
+                <button class="back-button" onclick="navigateTo('home')" style="margin-top:1rem;">← Back to Home</button>
+            </div>
+        </div>
+    `;
+}
 
 function renderAbout() {
     return `
@@ -1593,7 +1600,7 @@ function renderAbout() {
 }
 
 // ============================================================
-//  LEGAL PAGES
+//  Legal Pages Functions
 // ============================================================
 
 function showPrivacyPolicy() {
@@ -1652,29 +1659,7 @@ function getTermsOfServiceHTML() {
 }
 
 // ============================================================
-//  UTILITIES
-// ============================================================
-
-function parseMeds(str) {
-    if (!str) return [];
-    return str.split(',').map(m => m.trim()).filter(m => m.length > 0);
-}
-
-function cap(str) {
-    return str ? str.charAt(0).toUpperCase() + str.slice(1) : '';
-}
-
-function infoCard(label, value, borderColor, textColor) {
-    return `
-        <div style="background:white;padding:1rem;border-radius:.75rem;border-left:4px solid ${borderColor};">
-            <p style="font-size:.875rem;color:#4b5563;margin-bottom:.25rem;font-weight:600;">${label}</p>
-            <p style="font-size:1.125rem;font-weight:600;color:${textColor};">${value}</p>
-        </div>
-    `;
-}
-
-// ============================================================
-//  BOOTSTRAP
+//  Bootstrap
 // ============================================================
 
 document.addEventListener('DOMContentLoaded', async () => {
