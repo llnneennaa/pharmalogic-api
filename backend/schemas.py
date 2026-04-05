@@ -121,9 +121,9 @@ class AnalysisResult(BaseModel):
     lab_alerts: List[LabAlertOut]
     allergy_warnings: List[str] = []
     vitamin_warnings: List[VitaminWarningOut] = []
-    
-    
-    class DrugInteractionSummary(BaseModel):
+
+
+class DrugInteractionSummary(BaseModel):
     drug: str
     severity: str
     description: str
