@@ -121,3 +121,26 @@ class AnalysisResult(BaseModel):
     lab_alerts: List[LabAlertOut]
     allergy_warnings: List[str] = []
     vitamin_warnings: List[VitaminWarningOut] = []
+    
+    
+    class DrugInteractionSummary(BaseModel):
+    drug: str
+    severity: str
+    description: str
+
+
+class DrugDetailedOut(BaseModel):
+    id: int
+    name: str
+    description: str
+    common_uses: List[str] = []
+    side_effects: List[str] = []
+    contraindications: List[str] = []
+    interactions: List[DrugInteractionSummary] = []
+    vitamin_depletions: List[str] = []
+    pregnancy_safety: str = ""
+    counseling_points: List[str] = []
+    references: List[str] = []
+
+    class Config:
+        from_attributes = True

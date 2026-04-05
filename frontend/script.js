@@ -800,45 +800,233 @@ function renderGuestMedical() {
         <div class="page-container">
             <div class="dashboard-header">
                 <h1>Medical Team Access</h1>
-                <p>Analyze drug interactions powered by the live database</p>
+                <p>Professional tools for healthcare providers</p>
             </div>
 
-            <div style="max-width:800px;margin:2rem auto;background:white;border-radius:1rem;padding:2rem;box-shadow:0 2px 8px rgba(0,0,0,.1);border:1px solid #e5e7eb;text-align:center;">
-                <p style="color:#4b5563;font-size:1.125rem;margin-bottom:1rem;">Welcome to PharmaLogic Medical Team Access</p>
-                <p style="color:#4b5563;">Use our drug interaction checker to analyze medications for your patients. No registration required.</p>
+            <!-- Tab Navigation -->
+            <div style="max-width:1280px;margin:0 auto 2rem auto;display:flex;gap:0.5rem;border-bottom:2px solid #e5e7eb;">
+                <button id="tabInteractionsBtn" onclick="switchMedicalTab('interactions')" style="padding:0.75rem 1.5rem;background:#1B5E9D;color:white;border:none;border-radius:0.5rem 0.5rem 0 0;font-weight:600;cursor:pointer;">💊 Drug Interaction Analyzer</button>
+                <button id="tabInfoBtn" onclick="switchMedicalTab('info')" style="padding:0.75rem 1.5rem;background:#f3f4f6;color:#4b5563;border:none;border-radius:0.5rem 0.5rem 0 0;font-weight:600;cursor:pointer;">📋 Drug Information Viewer</button>
             </div>
 
-            <div class="interaction-checker">
-                <h2>Drug Interaction Analyzer</h2>
-                <p>Check for potential drug interactions</p>
-
-                <div id="medCountSelector" style="margin-bottom:2rem;padding:1.5rem;background:#f9fafb;border-radius:.75rem;">
-                    <p style="font-weight:600;margin-bottom:1rem;color:#2d2d47;">How many medications?</p>
-                    <div style="display:flex;gap:2rem;justify-content:center;flex-wrap:wrap;">
-                        <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;">
-                            <input type="radio" name="medCount" value="2" checked onchange="showMedInputs()"> 2 medications
-                        </label>
-                        <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;">
-                            <input type="radio" name="medCount" value="more" onchange="showMedInputs()"> More than 2
-                        </label>
-                    </div>
+            <!-- Tab 1: Drug Interaction Analyzer -->
+            <div id="interactionsTab" style="display:block;">
+                <div style="max-width:800px;margin:0 auto;background:white;border-radius:1rem;padding:2rem;box-shadow:0 2px 8px rgba(0,0,0,.1);border:1px solid #e5e7eb;text-align:center;margin-bottom:2rem;">
+                    <p style="color:#4b5563;font-size:1.125rem;margin-bottom:1rem;">Welcome to PharmaLogic Medical Team Access</p>
+                    <p style="color:#4b5563;">Use our drug interaction checker to analyze medications for your patients. No registration required.</p>
                 </div>
 
-                <div id="twoMedInputs">
+                <div class="interaction-checker">
+                    <h2>Drug Interaction Analyzer</h2>
+                    <p>Check for potential drug interactions</p>
+
+                    <div id="medCountSelector" style="margin-bottom:2rem;padding:1.5rem;background:#f9fafb;border-radius:.75rem;">
+                        <p style="font-weight:600;margin-bottom:1rem;color:#2d2d47;">How many medications?</p>
+                        <div style="display:flex;gap:2rem;justify-content:center;flex-wrap:wrap;">
+                            <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;">
+                                <input type="radio" name="medCount" value="2" checked onchange="showMedInputs()"> 2 medications
+                            </label>
+                            <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;">
+                                <input type="radio" name="medCount" value="more" onchange="showMedInputs()"> More than 2
+                            </label>
+                        </div>
+                    </div>
+
+                    <div id="twoMedInputs">
+                        <div class="checker-form">
+                            ${createAutocompleteInput('guestDrug1', 'First medication')}
+                            ${createAutocompleteInput('guestDrug2', 'Second medication')}
+                            <button id="guestAnalyzeBtn" onclick="checkGuestInteractions()" style="background:#1B5E9D;">Analyze</button>
+                        </div>
+                    </div>
+
+                    <div id="multiMedInputs" style="display:none;">
+                        <p style="margin-bottom:.75rem;color:#4b5563;">Enter all medications separated by commas:</p>
+                        <textarea id="guestDrugsList" rows="4" style="width:100%;padding:.75rem;border:2px solid #e5e7eb;border-radius:.5rem;margin-bottom:1rem;" placeholder="e.g., Aspirin, Metformin, Lisinopril"></textarea>
+                        <button id="guestMultiBtn" onclick="checkGuestMultiInteractions()" style="padding:.75rem 2rem;background:#1B5E9D;color:white;border:none;border-radius:.5rem;font-weight:600;cursor:pointer;">Analyze All</button>
+                    </div>
+
+                    <div id="guestResults"></div>
+                </div>
+            </div>
+
+            <!-- Tab 2: Drug Information Viewer -->
+            <div id="infoTab" style="display:none;">
+                <div class="interaction-checker">
+                    <h2>📋 Drug Information Viewer</h2>
+                    <p>Search for a medication to view comprehensive clinical information</p>
+
                     <div class="checker-form">
-                        ${createAutocompleteInput('guestDrug1', 'First medication')}
-                        ${createAutocompleteInput('guestDrug2', 'Second medication')}
-                        <button id="guestAnalyzeBtn" onclick="checkGuestInteractions()" style="background:#1B5E9D;">Analyze</button>
+                        ${createAutocompleteInput('infoDrugName', 'Enter medication name (e.g., Metformin, Aspirin)')}
+                        <button id="infoSearchBtn" onclick="searchDrugInformation()" style="background:#1B5E9D;">Search</button>
                     </div>
-                </div>
 
-                <div id="multiMedInputs" style="display:none;">
-                    <p style="margin-bottom:.75rem;color:#4b5563;">Enter all medications separated by commas:</p>
-                    <textarea id="guestDrugsList" rows="4" style="width:100%;padding:.75rem;border:2px solid #e5e7eb;border-radius:.5rem;margin-bottom:1rem;" placeholder="e.g., Aspirin, Metformin, Lisinopril"></textarea>
-                    <button id="guestMultiBtn" onclick="checkGuestMultiInteractions()" style="padding:.75rem 2rem;background:#1B5E9D;color:white;border:none;border-radius:.5rem;font-weight:600;cursor:pointer;">Analyze All</button>
+                    <div id="drugInfoResults" style="margin-top:2rem;"></div>
                 </div>
+            </div>
+        </div>
+    `;
+}
 
-                <div id="guestResults"></div>
+
+let currentMedicalTab = 'interactions';
+
+function switchMedicalTab(tab) {
+    currentMedicalTab = tab;
+    
+    const interactionsTab = document.getElementById('interactionsTab');
+    const infoTab = document.getElementById('infoTab');
+    const tabInteractionsBtn = document.getElementById('tabInteractionsBtn');
+    const tabInfoBtn = document.getElementById('tabInfoBtn');
+    
+    if (tab === 'interactions') {
+        interactionsTab.style.display = 'block';
+        infoTab.style.display = 'none';
+        tabInteractionsBtn.style.background = '#1B5E9D';
+        tabInteractionsBtn.style.color = 'white';
+        tabInfoBtn.style.background = '#f3f4f6';
+        tabInfoBtn.style.color = '#4b5563';
+    } else {
+        interactionsTab.style.display = 'none';
+        infoTab.style.display = 'block';
+        tabInteractionsBtn.style.background = '#f3f4f6';
+        tabInteractionsBtn.style.color = '#4b5563';
+        tabInfoBtn.style.background = '#1B5E9D';
+        tabInfoBtn.style.color = 'white';
+        
+        // Initialize autocomplete for the info tab
+        setTimeout(async () => {
+            const drugs = await getDrugList();
+            setupAutocomplete('infoDrugName', drugs);
+        }, 100);
+    }
+}
+
+
+async function searchDrugInformation() {
+    const drugName = document.getElementById('infoDrugName').value.trim();
+    const resultsDiv = document.getElementById('drugInfoResults');
+    
+    if (!drugName) {
+        showToast('Please enter a medication name', 'warning');
+        return;
+    }
+    
+    resultsDiv.innerHTML = '<p style="text-align:center;color:#4b5563;">⏳ Loading drug information...</p>';
+    
+    try {
+        // First, search for the drug in the database
+        const drugs = await apiFetch('/drugs');
+        const foundDrug = drugs.find(d => d.name.toLowerCase() === drugName.toLowerCase());
+        
+        if (!foundDrug) {
+            resultsDiv.innerHTML = `
+                <div style="background:#fef2f2;border:2px solid #dc2626;border-radius:.75rem;padding:1.5rem;text-align:center;">
+                    <h3 style="color:#dc2626;">⚠️ Drug Not Found</h3>
+                    <p style="color:#4b5563;">"${drugName}" is not in our database. Please check the spelling or try another medication.</p>
+                    <p style="font-size:.875rem;color:#6b7280;margin-top:1rem;">Available drugs: Aspirin, Metformin, Warfarin, Lisinopril, Omeprazole, Amoxicillin, and more.</p>
+                </div>
+            `;
+            return;
+        }
+        
+        // Get detailed information
+        const detailedInfo = await apiFetch(`/drugs/${foundDrug.id}/detailed`);
+        
+        resultsDiv.innerHTML = renderDrugInformation(detailedInfo);
+        
+    } catch (err) {
+        resultsDiv.innerHTML = `
+            <div style="background:#fee2e2;border:2px solid #dc2626;border-radius:.75rem;padding:1.5rem;text-align:center;">
+                <h3 style="color:#dc2626;">⚠️ Error Loading Information</h3>
+                <p style="color:#4b5563;">${getProfessionalErrorMessage(err)}</p>
+            </div>
+        `;
+    }
+}
+
+
+function renderDrugInformation(drug) {
+    return `
+        <div style="background:white;border-radius:1rem;box-shadow:0 4px 12px rgba(0,0,0,0.1);overflow:hidden;">
+            <!-- Header -->
+            <div style="background:linear-gradient(135deg,#1B5E9D,#FF8C00);padding:1.5rem;color:white;">
+                <h2 style="margin:0;font-size:1.75rem;">💊 ${drug.name}</h2>
+                <p style="margin:.5rem 0 0;opacity:0.9;">${drug.description || 'No description available'}</p>
+            </div>
+            
+            <div style="padding:1.5rem;">
+                <!-- Common Uses -->
+                <div style="margin-bottom:1.5rem;padding:1rem;background:#f0fdf4;border-radius:.75rem;border-left:4px solid #16a34a;">
+                    <h3 style="color:#16a34a;margin:0 0 .5rem 0;">💊 Common Uses</h3>
+                    <ul style="margin:0;padding-left:1.25rem;">
+                        ${drug.common_uses.map(use => `<li style="margin-bottom:.25rem;">${use}</li>`).join('')}
+                    </ul>
+                </div>
+                
+                <!-- Side Effects -->
+                <div style="margin-bottom:1.5rem;padding:1rem;background:#fffbeb;border-radius:.75rem;border-left:4px solid #d97706;">
+                    <h3 style="color:#d97706;margin:0 0 .5rem 0;">⚠️ Common Side Effects</h3>
+                    <ul style="margin:0;padding-left:1.25rem;">
+                        ${drug.side_effects.map(effect => `<li style="margin-bottom:.25rem;">${effect}</li>`).join('')}
+                    </ul>
+                </div>
+                
+                <!-- Contraindications -->
+                <div style="margin-bottom:1.5rem;padding:1rem;background:#fef2f2;border-radius:.75rem;border-left:4px solid #dc2626;">
+                    <h3 style="color:#dc2626;margin:0 0 .5rem 0;">🚫 Contraindications</h3>
+                    <ul style="margin:0;padding-left:1.25rem;">
+                        ${drug.contraindications.map(ci => `<li style="margin-bottom:.25rem;">${ci}</li>`).join('')}
+                    </ul>
+                </div>
+                
+                <!-- Drug Interactions -->
+                ${drug.interactions && drug.interactions.length > 0 ? `
+                <div style="margin-bottom:1.5rem;padding:1rem;background:#eff6ff;border-radius:.75rem;border-left:4px solid #3b82f6;">
+                    <h3 style="color:#3b82f6;margin:0 0 .5rem 0;">💊 Drug Interactions</h3>
+                    <ul style="margin:0;padding-left:1.25rem;">
+                        ${drug.interactions.map(interaction => `
+                            <li style="margin-bottom:.5rem;">
+                                <strong>${interaction.drug}</strong> (${interaction.severity} severity)<br>
+                                <span style="font-size:.875rem;color:#4b5563;">${interaction.description}</span>
+                            </li>
+                        `).join('')}
+                    </ul>
+                </div>
+                ` : ''}
+                
+                <!-- Vitamin Depletions -->
+                ${drug.vitamin_depletions && drug.vitamin_depletions.length > 0 ? `
+                <div style="margin-bottom:1.5rem;padding:1rem;background:#f3e8ff;border-radius:.75rem;border-left:4px solid #9333ea;">
+                    <h3 style="color:#9333ea;margin:0 0 .5rem 0;">🧪 Vitamin/Nutrient Depletions</h3>
+                    <ul style="margin:0;padding-left:1.25rem;">
+                        ${drug.vitamin_depletions.map(vd => `<li style="margin-bottom:.25rem;">${vd}</li>`).join('')}
+                    </ul>
+                </div>
+                ` : ''}
+                
+                <!-- Pregnancy & Lactation -->
+                <div style="margin-bottom:1.5rem;padding:1rem;background:#fef3c7;border-radius:.75rem;border-left:4px solid #f59e0b;">
+                    <h3 style="color:#f59e0b;margin:0 0 .5rem 0;">📋 Pregnancy & Lactation</h3>
+                    <p style="margin:0;">${drug.pregnancy_safety}</p>
+                </div>
+                
+                <!-- Counseling Points -->
+                <div style="margin-bottom:1.5rem;padding:1rem;background:#f0fdf4;border-radius:.75rem;border-left:4px solid #10b981;">
+                    <h3 style="color:#10b981;margin:0 0 .5rem 0;">💡 Key Counseling Points</h3>
+                    <ul style="margin:0;padding-left:1.25rem;">
+                        ${drug.counseling_points.map(point => `<li style="margin-bottom:.25rem;">${point}</li>`).join('')}
+                    </ul>
+                </div>
+                
+                <!-- References -->
+                <div style="padding:1rem;background:#f3f4f6;border-radius:.75rem;">
+                    <h3 style="color:#4b5563;margin:0 0 .5rem 0;">🔗 References</h3>
+                    <ul style="margin:0;padding-left:1.25rem;">
+                        ${drug.references.map(ref => `<li style="margin-bottom:.25rem;font-size:.875rem;">${ref}</li>`).join('')}
+                    </ul>
+                    <p style="font-size:.75rem;color:#9ca3af;margin-top:1rem;">⚠️ For professional reference only. Not a substitute for clinical judgment.</p>
+                </div>
             </div>
         </div>
     `;
