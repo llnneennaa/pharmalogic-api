@@ -1,6 +1,6 @@
 // ============================================================
 //  PharmaLogic – Frontend (API-connected version)
-//  Version: 3.0 - Added Allergy Warnings
+//  Version: 4.0 - Added Vitamin Deficiency Warnings
 // ============================================================
 
 // Dynamically resolve API base
@@ -609,7 +609,7 @@ async function handleSignup(event) {
 }
 
 // ============================================================
-//  PATIENT DASHBOARD
+//  PATIENT DASHBOARD (Modified: Removed profile box)
 // ============================================================
 
 function renderPatientDashboard() {
@@ -621,10 +621,6 @@ function renderPatientDashboard() {
             <div class="dashboard-header">
                 <h1>Welcome, ${currentUser.name || 'Patient'}</h1>
                 <p>Manage your medications and check for interactions</p>
-            </div>
-
-            <div style="max-width:1280px;margin:2rem auto;background:linear-gradient(135deg,rgba(255,140,0,.1) 0%,rgba(27,94,157,.1) 100%);border-radius:1rem;padding:2rem;box-shadow:0 2px 8px rgba(0,0,0,.1);border:2px solid #FFE4CC;">
-                ${editingProfile ? renderEditProfileForm() : renderViewProfileSummary()}
             </div>
 
             <div class="dashboard-grid">
@@ -650,153 +646,34 @@ function renderPatientDashboard() {
     `;
 }
 
-function renderViewProfileSummary() {
-    const meds = parseMeds(currentUser?.medications);
-    const allergies = currentUser?.allergies || 'None';
-    const medHTML = meds.length
-        ? meds.map(m => `<span style="display:inline-block;background:#FFE4CC;color:#1B5E9D;padding:.4rem .9rem;border-radius:.5rem;margin:.2rem;font-size:.875rem;font-weight:500;">${m}</span>`).join('')
-        : '<p style="color:#4b5563;font-style:italic;">No medications added yet</p>';
-
-    return `
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem;">
-            <h2 style="font-size:1.25rem;font-weight:700;color:#1B5E9D;margin:0;">Your Medical Profile</h2>
-            <button onclick="editProfile()" style="padding:.5rem 1rem;background:#1B5E9D;color:white;border:none;border-radius:.5rem;cursor:pointer;font-weight:600;font-size:.875rem;">✏️ Edit Profile</button>
-        </div>
-        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:1rem;margin-bottom:1.5rem;">
-            ${profileCard('Age',                currentUser?.age || 'Not provided')}
-            ${profileCard('Gender',             currentUser?.gender ? cap(currentUser.gender) : 'Not provided')}
-            ${profileCard('Medical Conditions', currentUser?.conditions || 'None')}
-            ${profileCard('Allergies',          allergies)}
-        </div>
-        <div>
-            <p style="font-size:.75rem;color:#4b5563;margin-bottom:.5rem;text-transform:uppercase;font-weight:600;">Current Medications (${meds.length})</p>
-            <div style="display:flex;flex-wrap:wrap;gap:.5rem;">${medHTML}</div>
-        </div>
-    `;
-}
-
-function profileCard(label, value) {
-    return `
-        <div style="background:white;padding:1rem;border-radius:.75rem;border-left:4px solid #FF8C00;">
-            <p style="font-size:.75rem;color:#4b5563;margin-bottom:.25rem;text-transform:uppercase;font-weight:600;">${label}</p>
-            <p style="font-size:1.1rem;font-weight:700;color:#1B5E9D;">${value}</p>
-        </div>
-    `;
-}
-
-function renderEditProfileForm() {
-    const user = editFormData || currentUser;
-    const meds = parseMeds(user?.medications || '');
-
-    const medsList = meds.map(med => `
-        <li style="padding:.75rem;background:#FFE4CC;margin-bottom:.5rem;border-radius:.5rem;border-left:4px solid #FF8C00;color:#1B5E9D;font-weight:500;display:flex;justify-content:space-between;align-items:center;">
-            <span>${med}</span>
-            <button type="button" onclick="removeMedication('${med}')" style="background:#dc2626;color:white;border:none;padding:.25rem .5rem;border-radius:.25rem;cursor:pointer;font-size:.875rem;">✕</button>
-        </li>`).join('');
-
-    return `
-        <form onsubmit="saveProfile(event)">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem;">
-                <h2 style="font-size:1.25rem;font-weight:700;color:#1B5E9D;margin:0;">Edit Your Medical Profile</h2>
-                <button type="button" onclick="cancelEdit()" style="padding:.5rem 1rem;background:#6b7280;color:white;border:none;border-radius:.5rem;cursor:pointer;font-weight:600;font-size:.875rem;">Cancel</button>
-            </div>
-            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1rem;margin-bottom:1.5rem;">
-                <div class="form-group" style="margin:0;">
-                    <label style="font-size:.75rem;color:#4b5563;text-transform:uppercase;font-weight:600;">Age</label>
-                    <input type="number" id="editAge" value="${user?.age || ''}" style="width:100%;padding:.75rem;border:2px solid #e5e7eb;border-radius:.5rem;">
-                </div>
-                <div class="form-group" style="margin:0;">
-                    <label style="font-size:.75rem;color:#4b5563;text-transform:uppercase;font-weight:600;">Gender</label>
-                    <select id="editGender" style="width:100%;padding:.75rem;border:2px solid #e5e7eb;border-radius:.5rem;">
-                        <option value="">Select gender</option>
-                        <option value="male"   ${user?.gender==='male'   ?'selected':''}>Male</option>
-                        <option value="female" ${user?.gender==='female' ?'selected':''}>Female</option>
-                        <option value="other"  ${user?.gender==='other'  ?'selected':''}>Other</option>
-                    </select>
-                </div>
-            </div>
-            <div class="form-group" style="margin-bottom:1.5rem;">
-                <label style="font-size:.75rem;color:#4b5563;text-transform:uppercase;font-weight:600;">Chronic Conditions</label>
-                <input type="text" id="editConditions" value="${user?.conditions || ''}" placeholder="e.g., Diabetes, Hypertension" style="width:100%;padding:.75rem;border:2px solid #e5e7eb;border-radius:.5rem;">
-            </div>
-            <div class="form-group" style="margin-bottom:1.5rem;">
-                <label style="font-size:.75rem;color:#4b5563;text-transform:uppercase;font-weight:600;">Allergies</label>
-                <input type="text" id="editAllergies" value="${user?.allergies || ''}" placeholder="e.g., Penicillin, Aspirin" style="width:100%;padding:.75rem;border:2px solid #e5e7eb;border-radius:.5rem;">
-            </div>
-            <div class="form-group" style="margin-bottom:2rem;">
-                <label style="font-size:.75rem;color:#4b5563;text-transform:uppercase;font-weight:600;">Current Medications</label>
-                <ul style="list-style:none;padding:0;margin-bottom:1rem;max-height:200px;overflow-y:auto;">${medsList}</ul>
-                <div style="display:flex;gap:.5rem;">
-                    <input type="text" id="addMedication" placeholder="Add medication(s), comma-separated" style="flex:1;padding:.75rem;border:2px solid #e5e7eb;border-radius:.5rem;">
-                    <button type="button" onclick="addMedications()" style="padding:.75rem 1.5rem;background:#1B5E9D;color:white;border:none;border-radius:.5rem;cursor:pointer;font-weight:600;">Add</button>
-                </div>
-            </div>
-            <div style="display:flex;gap:1rem;justify-content:flex-end;">
-                <button type="button" onclick="cancelEdit()" style="padding:.5rem 1rem;background:#6b7280;color:white;border:none;border-radius:.5rem;cursor:pointer;font-weight:600;">Cancel</button>
-                <button type="submit" class="form-button" id="saveProfileBtn" style="width:auto;">Save Changes</button>
-            </div>
-        </form>
-    `;
-}
-
-function editProfile() {
-    editFormData = { ...currentUser, medications: currentUser.medications || '' };
-    editingProfile = true;
-    renderPage();
-}
-
-function removeMedication(med) {
-    const meds = parseMeds(editFormData.medications).filter(m => m !== med);
-    editFormData.medications = meds.join(', ');
-    renderPage();
-}
-
-function addMedications() {
-    const input   = document.getElementById('addMedication');
-    const newMeds = input.value.split(',').map(m => m.trim()).filter(m => m);
-    if (!newMeds.length) return;
-
-    const current = parseMeds(editFormData.medications);
-    newMeds.forEach(m => { if (!current.includes(m)) current.push(m); });
-    editFormData.medications = current.join(', ');
-    input.value = '';
-    renderPage();
-}
-
-async function saveProfile(event) {
-    event.preventDefault();
-    const btn = document.getElementById('saveProfileBtn');
-    btn.disabled    = true;
-    btn.textContent = 'Saving…';
-
-    const age        = document.getElementById('editAge').value;
-    const gender     = document.getElementById('editGender').value;
-    const conditions = document.getElementById('editConditions').value.trim();
-    const allergies  = document.getElementById('editAllergies').value.trim();
-    const medications= editFormData.medications;
-
-    try {
-        const updated = await apiFetch('/users/me', {
-            method : 'PUT',
-            body   : JSON.stringify({ age: age ? parseInt(age) : null, gender, conditions, allergies, medications }),
-        });
-        currentUser    = updated;
-        editingProfile = false;
-        editFormData   = null;
-        renderPage();
-        showToast('Profile updated successfully!', 'success');
-        console.log("✅ Profile updated, allergies:", updated.allergies);
-    } catch (err) {
-        showToast(getProfessionalErrorMessage(err), 'error');
-        btn.disabled    = false;
-        btn.textContent = 'Save Changes';
+// Helper function to get vitamin warnings for medications
+function getVitaminWarningsForMeds(meds) {
+    const vitaminRules = {
+        "Metformin": { deficiency: "Vitamin B12", recommendation: "Check Vitamin B12 levels annually" },
+        "Omeprazole": { deficiency: "Vitamin B12, Magnesium", recommendation: "Monitor Vitamin B12 and Magnesium levels" },
+        "Pantoprazole": { deficiency: "Vitamin B12, Magnesium", recommendation: "Monitor Vitamin B12 and Magnesium levels" },
+        "Esomeprazole": { deficiency: "Vitamin B12, Magnesium", recommendation: "Monitor Vitamin B12 and Magnesium levels" },
+        "Lansoprazole": { deficiency: "Vitamin B12, Magnesium", recommendation: "Monitor Vitamin B12 and Magnesium levels" },
+        "Methotrexate": { deficiency: "Folate (Vitamin B9)", recommendation: "Supplement with Folic acid and monitor levels" },
+        "Phenytoin": { deficiency: "Vitamin D, Calcium, Folate", recommendation: "Monitor Vitamin D, Calcium, and Folate levels" },
+        "Carbamazepine": { deficiency: "Vitamin D, Calcium, Folate", recommendation: "Monitor Vitamin D, Calcium, and Folate levels" },
+        "Valproate": { deficiency: "Carnitine, Folate", recommendation: "Monitor Carnitine and Folate levels" },
+        "Hydrochlorothiazide": { deficiency: "Potassium, Magnesium, Sodium", recommendation: "Monitor electrolytes (Potassium, Magnesium, Sodium)" },
+        "Furosemide": { deficiency: "Potassium, Magnesium, Sodium, Calcium", recommendation: "Monitor electrolytes (Potassium, Magnesium, Sodium, Calcium)" },
+        "Colchicine": { deficiency: "Vitamin B12", recommendation: "Monitor Vitamin B12 levels with long-term use" }
+    };
+    
+    const warnings = [];
+    for (const med of meds) {
+        if (vitaminRules[med]) {
+            warnings.push({
+                drug: med,
+                deficiency: vitaminRules[med].deficiency,
+                recommendation: vitaminRules[med].recommendation
+            });
+        }
     }
-}
-
-function cancelEdit() {
-    editingProfile = false;
-    editFormData   = null;
-    renderPage();
+    return warnings;
 }
 
 function showPatientFeature(feature) {
@@ -804,10 +681,28 @@ function showPatientFeature(feature) {
     const meds    = parseMeds(currentUser?.medications);
 
     if (feature === 'medications') {
+        // Get vitamin warnings for current medications
+        const vitaminWarnings = getVitaminWarningsForMeds(meds);
+        
+        let medsHTML = '';
+        for (const med of meds) {
+            const warning = vitaminWarnings.find(w => w.drug.toLowerCase() === med.toLowerCase());
+            medsHTML += `
+                <li style="padding:.75rem;background:#FFE4CC;margin-bottom:.5rem;border-radius:.5rem;border-left:4px solid #FF8C00;color:#1B5E9D;font-weight:500;">
+                    <div>💊 ${med}</div>
+                    ${warning ? `
+                        <div style="margin-top:.5rem;padding:.5rem;background:#fff3e0;border-radius:.5rem;font-size:.875rem;font-weight:normal;">
+                            <div style="color:#d97706;">🧪 Vitamin Deficiency Warning:</div>
+                            <div>Long-term use may cause ${warning.deficiency} deficiency</div>
+                            <div style="color:#1B5E9D;margin-top:.25rem;">→ ${warning.recommendation}</div>
+                        </div>
+                    ` : ''}
+                </li>
+            `;
+        }
+        
         const medHTML = meds.length
-            ? '<ul style="list-style:none;padding:0;margin:1rem 0;">' +
-              meds.map(m => `<li style="padding:.75rem;background:#FFE4CC;margin-bottom:.5rem;border-radius:.5rem;border-left:4px solid #FF8C00;color:#1B5E9D;font-weight:500;">💊 ${m}</li>`).join('') +
-              '</ul>'
+            ? `<ul style="list-style:none;padding:0;margin:1rem 0;">${medsHTML}</ul>`
             : '<p style="color:#4b5563;font-style:italic;padding:1rem;background:#f9fafb;border-radius:.5rem;">No medications added yet</p>';
 
         content.innerHTML = `
@@ -883,10 +778,9 @@ async function checkNewDrugInteractions() {
         });
 
         console.log("🔍 API Response Data:", data);
-        console.log("🔍 Allergy warnings from API:", data.allergy_warnings);
+        console.log("🔍 Vitamin warnings from API:", data.vitamin_warnings);
 
         lastInteractionResults = { patient: currentUser, newDrug, apiResult: data, timestamp: new Date().toLocaleString() };
-
         results.innerHTML = renderAnalysisResult(data, newDrug);
         addExportButton(results);
     } catch (err) {
@@ -1128,12 +1022,13 @@ async function runMedAnalysis(drugs) {
 }
 
 // ============================================================
-//  SHARED ANALYSIS RESULT RENDERER (with allergy warnings)
+//  SHARED ANALYSIS RESULT RENDERER (with allergy + vitamin warnings)
 // ============================================================
 
 function renderAnalysisResult(data, highlightDrug = null) {
     console.log("🚨 renderAnalysisResult called with data:", data);
     console.log("🚨 allergy_warnings value:", data.allergy_warnings);
+    console.log("🚨 vitamin_warnings value:", data.vitamin_warnings);
     
     // التأكد من وجود risk_percentage
     let risk_percentage = data.risk_percentage;
@@ -1189,6 +1084,23 @@ function renderAnalysisResult(data, highlightDrug = null) {
                     ${data.allergy_warnings.map(w => `<li style="padding:.5rem 0;border-bottom:1px solid #fecaca;color:#991b1b;">⚠️ ${w}</li>`).join('')}
                 </ul>
                 <p style="font-size:.875rem;color:#991b1b;margin-top:.75rem;">Please consult your healthcare provider before taking these medications.</p>
+            </div>
+        `;
+    }
+    
+    // ========== عرض تحذيرات نقص الفيتامينات ==========
+    if (data.vitamin_warnings && data.vitamin_warnings.length > 0) {
+        html += `
+            <div style="background:#eff6ff;border:2px solid #3b82f6;border-radius:.75rem;padding:1.25rem;margin-bottom:1.5rem;">
+                <h3 style="color:#1d4ed8;margin-bottom:0.75rem;">🧪 Vitamin/Nutrient Deficiency Warnings (${data.vitamin_warnings.length})</h3>
+                <ul style="list-style:none;padding:0;">
+                    ${data.vitamin_warnings.map(w => `
+                        <li style="padding:.5rem 0;border-bottom:1px solid #bfdbfe;color:#1e40af;">
+                            <strong>⚠️ ${w.drug}</strong>: Long-term use may cause ${w.deficiency} deficiency<br>
+                            <span style="font-size:.875rem;">→ Recommendation: ${w.recommendation}</span>
+                        </li>
+                    `).join('')}
+                </ul>
             </div>
         `;
     }
@@ -1251,7 +1163,7 @@ function addExportButton(container) {
 function exportToPDF() {
     if (!lastInteractionResults) { showToast('No interaction results to export', 'warning'); return; }
     const { patient, newDrug, apiResult, timestamp } = lastInteractionResults;
-    const { interactions, risk_level, risk_percentage, recommendation, lab_alerts, allergy_warnings } = apiResult;
+    const { interactions, risk_level, risk_percentage, recommendation, lab_alerts, allergy_warnings, vitamin_warnings } = apiResult;
     const meds = parseMeds(patient?.medications);
 
     const pdfContent = `<!DOCTYPE html><html><head><meta charset="UTF-8">
@@ -1288,6 +1200,11 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-widt
 ${allergy_warnings && allergy_warnings.length > 0 ? `
 <div class="allergy-box"><h3 style="color:#dc2626;">🚨 Allergy Warnings</h3>
   <ul>${allergy_warnings.map(w => `<li>⚠️ ${w}</li>`).join('')}</ul>
+</div>` : ''}
+${vitamin_warnings && vitamin_warnings.length > 0 ? `
+<div class="alert-box" style="background:#eff6ff;border:2px solid #3b82f6;">
+  <h3 style="color:#1d4ed8;">🧪 Vitamin/Nutrient Deficiency Warnings</h3>
+  <ul>${vitamin_warnings.map(w => `<li><strong>${w.drug}</strong>: Long-term use may cause ${w.deficiency} deficiency<br>→ ${w.recommendation}</li>`).join('')}</ul>
 </div>` : ''}
 <div class="section"><h3>Risk Assessment</h3>
   <p><strong>Overall Risk:</strong> ${cap(risk_level)}</p>

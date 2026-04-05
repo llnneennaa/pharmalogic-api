@@ -107,6 +107,12 @@ class AnalysisRequest(BaseModel):
     drugs: List[str]
 
 
+class VitaminWarningOut(BaseModel):
+    drug: str
+    deficiency: str
+    recommendation: str
+
+
 class AnalysisResult(BaseModel):
     interactions: List[InteractionOut]
     risk_level: str
@@ -114,3 +120,4 @@ class AnalysisResult(BaseModel):
     recommendation: str
     lab_alerts: List[LabAlertOut]
     allergy_warnings: List[str] = []
+    vitamin_warnings: List[VitaminWarningOut] = []

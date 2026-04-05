@@ -7,6 +7,93 @@ from typing import List, Dict, Any, Optional
 import models
 
 
+def check_vitamin_deficiencies(drug_names: List[str]) -> List[Dict[str, str]]:
+    """
+    Check which medications may cause vitamin deficiencies with long-term use
+    
+    Returns:
+        List of dictionaries with keys: drug, deficiency, recommendation
+    """
+    # Vitamin deficiency rules
+    vitamin_rules = {
+        "Metformin": {
+            "deficiency": "Vitamin B12",
+            "recommendation": "Check Vitamin B12 levels annually"
+        },
+        "Omeprazole": {
+            "deficiency": "Vitamin B12, Magnesium",
+            "recommendation": "Monitor Vitamin B12 and Magnesium levels"
+        },
+        "Pantoprazole": {
+            "deficiency": "Vitamin B12, Magnesium",
+            "recommendation": "Monitor Vitamin B12 and Magnesium levels"
+        },
+        "Esomeprazole": {
+            "deficiency": "Vitamin B12, Magnesium",
+            "recommendation": "Monitor Vitamin B12 and Magnesium levels"
+        },
+        "Lansoprazole": {
+            "deficiency": "Vitamin B12, Magnesium",
+            "recommendation": "Monitor Vitamin B12 and Magnesium levels"
+        },
+        "Methotrexate": {
+            "deficiency": "Folate (Vitamin B9)",
+            "recommendation": "Supplement with Folic acid and monitor levels"
+        },
+        "Phenytoin": {
+            "deficiency": "Vitamin D, Calcium, Folate",
+            "recommendation": "Monitor Vitamin D, Calcium, and Folate levels"
+        },
+        "Carbamazepine": {
+            "deficiency": "Vitamin D, Calcium, Folate",
+            "recommendation": "Monitor Vitamin D, Calcium, and Folate levels"
+        },
+        "Valproate": {
+            "deficiency": "Carnitine, Folate",
+            "recommendation": "Monitor Carnitine and Folate levels"
+        },
+        "Cholestyramine": {
+            "deficiency": "Vitamin A, D, E, K, Folate",
+            "recommendation": "Monitor fat-soluble vitamins (A, D, E, K) and Folate"
+        },
+        "Warfarin": {
+            "deficiency": "Vitamin K (interaction, not deficiency)",
+            "recommendation": "Maintain consistent Vitamin K intake, monitor INR"
+        },
+        "Levothyroxine": {
+            "deficiency": "None directly",
+            "recommendation": "Monitor thyroid function tests"
+        },
+        "Hydrochlorothiazide": {
+            "deficiency": "Potassium, Magnesium, Sodium",
+            "recommendation": "Monitor electrolytes (Potassium, Magnesium, Sodium)"
+        },
+        "Furosemide": {
+            "deficiency": "Potassium, Magnesium, Sodium, Calcium",
+            "recommendation": "Monitor electrolytes (Potassium, Magnesium, Sodium, Calcium)"
+        },
+        "Spironolactone": {
+            "deficiency": "Potassium (increased, not deficiency)",
+            "recommendation": "Monitor potassium levels - risk of hyperkalemia"
+        },
+        "Colchicine": {
+            "deficiency": "Vitamin B12",
+            "recommendation": "Monitor Vitamin B12 levels with long-term use"
+        },
+    }
+    
+    warnings = []
+    for drug in drug_names:
+        if drug in vitamin_rules:
+            warnings.append({
+                "drug": drug,
+                "deficiency": vitamin_rules[drug]["deficiency"],
+                "recommendation": vitamin_rules[drug]["recommendation"]
+            })
+    
+    return warnings
+
+
 def check_allergy_warnings(drug_names: List[str], allergies: str) -> List[str]:
     """
     Check for allergy warnings based on patient allergies
@@ -175,6 +262,9 @@ def analyze_drugs(db: Session, drug_names: List[str], user: Optional[models.User
     else:
         print("🔍 No allergies found for user")
     
+    # Add vitamin deficiency warnings
+    vitamin_warnings = check_vitamin_deficiencies(drug_names)
+    
     return {
         "interactions": interactions,
         "risk_level": risk_level,
@@ -182,7 +272,8 @@ def analyze_drugs(db: Session, drug_names: List[str], user: Optional[models.User
         "recommendation": recommendation,
         "lab_alerts": lab_alerts,
         "condition_warnings": condition_warnings,
-        "allergy_warnings": allergy_warnings
+        "allergy_warnings": allergy_warnings,
+        "vitamin_warnings": vitamin_warnings
     }
 
 
@@ -280,7 +371,8 @@ def analyze_with_user_profile(db: Session, user: models.User) -> Dict[str, Any]:
             "recommendation": "No medications in your profile. Add medications to check for interactions.",
             "lab_alerts": [],
             "condition_warnings": [],
-            "allergy_warnings": []
+            "allergy_warnings": [],
+            "vitamin_warnings": []
         }
     
     drug_names = [d.strip() for d in user.medications.split(",") if d.strip()]
