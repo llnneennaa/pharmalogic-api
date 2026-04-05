@@ -1,4 +1,4 @@
-// ============================================================
+renderGuestMedical()// ============================================================
 //  PharmaLogic – Frontend (API-connected version)
 //  Version: 4.0 - Added Vitamin Deficiency Warnings
 // ============================================================
@@ -621,6 +621,11 @@ function renderPatientDashboard() {
             <div class="dashboard-header">
                 <h1>Welcome, ${currentUser.name || 'Patient'}</h1>
                 <p>Manage your medications and check for interactions</p>
+            </div>
+
+            <!-- Profile Summary Box with Edit Button -->
+            <div style="max-width:1280px;margin:2rem auto;background:linear-gradient(135deg,rgba(255,140,0,.1) 0%,rgba(27,94,157,.1) 100%);border-radius:1rem;padding:2rem;box-shadow:0 2px 8px rgba(0,0,0,.1);border:2px solid #FFE4CC;">
+                ${editingProfile ? renderEditProfileForm() : renderViewProfileSummary()}
             </div>
 
             <div class="dashboard-grid">
